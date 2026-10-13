@@ -5,7 +5,7 @@ import (
 	"hash/fnv"
 	"strings"
 
-	"github.com/kjkrol/goke/v3"
+	"github.com/kjkrol/ceremony/store"
 )
 
 type tree struct {
@@ -20,8 +20,8 @@ type laid struct {
 }
 
 func (t *tree) add(s exec, sign string) int {
-	if len(t.nodes) == MaxSteps {
-		panic(fmt.Sprintf("rule: %q has more than %d steps", t.name, MaxSteps))
+	if len(t.nodes) == store.MaxSteps {
+		panic(fmt.Sprintf("rule: %q has more than %d steps", t.name, store.MaxSteps))
 	}
 	t.nodes = append(t.nodes, laid{exec: s})
 	t.signs = append(t.signs, sign)
@@ -46,27 +46,21 @@ type definition struct {
 	name string
 	root Step
 	sign string
-	load []goke.CompToken
 }
 
 // Define lays root out as the plan named name and returns its id, what a Mind carries. A name
-// defined twice, or after the plans' system is set up, panics.
+// defined twice, or after the plans are bound, panics.
 func (c *Plans) Define(name string, root Step) uint64 {
 	if name == "" {
 		panic("rule: a plan needs a name")
 	}
-	s := c.system
-	if s.si != nil {
+	s := c
+	if s.bound {
 		panic(fmt.Sprintf("rule: the plan %q is defined after the game was set up", name))
 	}
 	root = named(name, root)
 	t := layOut(name, root)
 	d := definition{name: name, root: root, sign: t.signature()}
-	for _, n := range t.nodes {
-		if l, ok := n.exec.(interface{ loads() []goke.CompToken }); ok {
-			d.load = append(d.load, l.loads()...)
-		}
-	}
 	id := hash(name)
 	if have, ok := s.defs[id]; ok {
 		panic(fmt.Sprintf("rule: the plan %q is defined already (or shares its hash with %q)", name, have.name))

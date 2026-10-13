@@ -29,7 +29,8 @@ func within[F any](t tag.Tag[F], r Rule, desc string) Rule {
 	if reflect.TypeFor[F]() == reflect.TypeFor[tag.Anything]() {
 		return r
 	}
-	n := narrowing{side: host.SideOf(t), carrier: carrierOf(t), desc: desc}
+	n := narrowing{side: host.SideOf(t), family: reflect.TypeFor[tag.Tags[F]](), bit: uint8(t),
+		desc: desc}
 	if role, ok := any(t).(tag.Tag[cond.Roles]); ok {
 		n.role = 1 << role
 	}
@@ -44,24 +45,15 @@ func forRole(r Rule, role cond.Role) Rule {
 	return within(role.Tag(), r, desc)
 }
 
-type side struct {
-	tags    func() state
-	carries func(state any) bool
-}
-
-func carrierOf[F any](t tag.Tag[F]) *side {
-	return &side{tags: func() state { return stateOf[tag.Tags[F]]() },
-		carries: func(state any) bool { return state.(*tag.Tags[F]).Has(t) }}
-}
-
-func (s *side) column() column { return column{mk: s.tags, holds: s.carries} }
-
 type narrowing struct {
-	side    host.Side
-	carrier *side
-	desc    string
-	role    uint64
+	side   host.Side
+	family reflect.Type
+	bit    uint8
+	desc   string
+	role   uint64
 }
+
+func (n narrowing) column() column { return column{family: n.family, bit: n.bit} }
 
 func (n narrowing) label(l string) string {
 	if n.desc == "" {
@@ -94,7 +86,7 @@ func (f *fired[P]) fire(t host.Tick, about P) {
 	}
 	p := steps.Pass{Commands: t.Commands, Effects: t.Effects, Dt: t.Dt, Time: t.Time,
 		Seed: t.Seed, Around: t.Around, Roles: t.Roles}
-	f.run.Fire(p, t.CmdBuf, id, f.about, subject, aimed)
+	f.run.Fire(p, id, f.about, subject, aimed)
 }
 
 func construct[P any](name string, filter sides, root steps.Step) Rule {
@@ -111,7 +103,7 @@ func construct[P any](name string, filter sides, root steps.Step) Rule {
 }
 
 func (e *every[P]) narrowed(n narrowing) Rule {
-	each := newEachWith(n.label(e.label), e.react, n.carrier.column())
+	each := newEachWith(n.label(e.label), e.react, n.column())
 	if n.role == 0 {
 		return each
 	}
@@ -129,9 +121,9 @@ func (p *played[P]) narrowed(n narrowing) Rule {
 func (e *eachWith[P]) narrowed(n narrowing) Rule {
 	conds := make([]column, 0, len(e.conds)+1)
 	for _, c := range e.conds {
-		conds = append(conds, column{mk: c.mk, holds: c.holds})
+		conds = append(conds, column{family: c.family, bit: c.bit})
 	}
-	return newEachWith(n.label(e.label), e.react, append(conds, n.carrier.column())...)
+	return newEachWith(n.label(e.label), e.react, append(conds, n.column())...)
 }
 
 func (p *pair[P]) sided(other host.Side) Rule {

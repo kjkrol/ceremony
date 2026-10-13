@@ -1,9 +1,11 @@
 package act
 
 import (
+	"reflect"
+
 	"github.com/kjkrol/ceremony/cond"
 	"github.com/kjkrol/ceremony/host"
-	"github.com/kjkrol/goke/v3"
+	"github.com/kjkrol/ceremony/store"
 )
 
 type every[P any] struct {
@@ -17,10 +19,10 @@ func (e *every[P]) ForRole(role cond.Role) Rule { return forRole(e, role) }
 
 func (e *every[P]) String() string { return e.label }
 
-func (*every[P]) BindColumns(*host.Columns) {}
+func (*every[P]) BindColumns(store.Columns) {}
 
-func (e *every[P]) RunEach(t host.Tick, cursor *goke.Cursor, keep func(i int) bool, about func(i int) P) {
-	for i := range cursor.IDs {
+func (e *every[P]) RunEach(t host.Tick, _ store.Row, n int, keep func(i int) bool, about func(i int) P) {
+	for i := range n {
 		if keep == nil || keep(i) {
 			e.react(t, about(i))
 		}
@@ -29,24 +31,12 @@ func (e *every[P]) RunEach(t host.Tick, cursor *goke.Cursor, keep func(i int) bo
 
 func (e *every[P]) RunOnce(t host.Tick, about P) { e.react(t, about) }
 
-type state interface {
-	bind(cols *host.Columns)
-	present(cursor *goke.Cursor) bool
-	at(cursor *goke.Cursor, i int) any
-}
-
-func stateOf[T any]() state { return &stateCol[T]{} }
-
-type stateCol[T any] struct{ comp *goke.OptComp[T] }
-
-func (s *stateCol[T]) bind(cols *host.Columns)           { s.comp = cols.Of[T]() }
-func (s *stateCol[T]) present(cursor *goke.Cursor) bool  { return s.comp.Present(cursor) }
-func (s *stateCol[T]) at(cursor *goke.Cursor, i int) any { return &s.comp.Slice(cursor)[i] }
-
+// column is a tag of a family an entity must carry for the rule to fire on it, read off the
+// family's column of the pass's query
 type column struct {
-	mk    func() state
-	s     state
-	holds func(state any) bool // nil: carrying it is enough
+	family reflect.Type // the family's component type, tag.Tags[F]
+	bit    uint8
+	col    store.Col
 }
 
 type eachWith[P any] struct {
@@ -56,9 +46,6 @@ type eachWith[P any] struct {
 }
 
 func newEachWith[P any](label string, react func(host.Tick, P), conds ...column) *eachWith[P] {
-	for i := range conds {
-		conds[i].s = conds[i].mk()
-	}
 	return &eachWith[P]{label: label, conds: conds, react: react}
 }
 
@@ -68,28 +55,28 @@ func (e *eachWith[P]) ForRole(role cond.Role) Rule { return forRole(e, role) }
 
 func (e *eachWith[P]) String() string { return e.label }
 
-func (e *eachWith[P]) BindColumns(cols *host.Columns) {
-	for _, c := range e.conds {
-		c.s.bind(cols)
+func (e *eachWith[P]) BindColumns(cols store.Columns) {
+	for i := range e.conds {
+		e.conds[i].col = cols.Column(e.conds[i].family)
 	}
 }
 
-func (e *eachWith[P]) RunEach(t host.Tick, cursor *goke.Cursor, keep func(i int) bool, about func(i int) P) {
+func (e *eachWith[P]) RunEach(t host.Tick, row store.Row, n int, keep func(i int) bool, about func(i int) P) {
 	for _, c := range e.conds {
-		if !c.s.present(cursor) {
+		if row.Columns[c.col.Idx] == nil {
 			return
 		}
 	}
-	for i := range cursor.IDs {
-		if (keep == nil || keep(i)) && e.holds(cursor, i) {
+	for i := range n {
+		if (keep == nil || keep(i)) && e.holds(row, i) {
 			e.react(t, about(i))
 		}
 	}
 }
 
-func (e *eachWith[P]) holds(cursor *goke.Cursor, i int) bool {
+func (e *eachWith[P]) holds(row store.Row, i int) bool {
 	for _, c := range e.conds {
-		if c.holds != nil && !c.holds(c.s.at(cursor, i)) {
+		if *(*uint64)(row.At(c.col, i))&(1<<c.bit) == 0 {
 			return false
 		}
 	}

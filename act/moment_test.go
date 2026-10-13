@@ -12,6 +12,8 @@ import (
 	"github.com/kjkrol/ceremony/host"
 	"github.com/kjkrol/ceremony/tag"
 	"github.com/kjkrol/goke/v3"
+
+	cgoke "github.com/kjkrol/ceremony/goke"
 	"github.com/kjkrol/uid"
 )
 
@@ -85,11 +87,12 @@ func runRule[P any](t *testing.T, h *host.Rules[P], tick host.Tick, about func(u
 			m(ids)
 		}
 		qb := si.NewQueryBuilder(&tokens)
-		h.Bind(qb)
+		cols := cgoke.NewColumns(qb)
+		h.Bind(cols)
 		q := qb.Build()
 		for q.All(); q.Next(); {
 			cur := q.Cursor()
-			h.Run(tick, cur, func(i int) P { return about(cur.IDs[i]) })
+			h.Run(tick, cols.Row(cur), len(cur.IDs), func(i int) P { return about(cur.IDs[i]) })
 		}
 	}})
 	return ids
@@ -182,14 +185,15 @@ func TestRule_ChanceIsTheSameForTheSameSeedAndTime(t *testing.T) {
 			f.Next()
 			ids := f.Cursor.IDs
 			qb := si.NewQueryBuilder(&tokens)
-			h.Bind(qb)
+			cols := cgoke.NewColumns(qb)
+			h.Bind(cols)
 			q := qb.Build()
 			for k := range steps {
 				tick := host.Tick{Dt: time.Millisecond, Commands: &carrier,
 					Time: time.Duration(k+1) * time.Millisecond, Seed: seed}
 				for q.All(); q.Next(); {
 					cur := q.Cursor()
-					h.Run(tick, cur, func(i int) nudge { return nudge{self: cur.IDs[i], by: cur.IDs[1-i]} })
+					h.Run(tick, cols.Row(cur), len(cur.IDs), func(i int) nudge { return nudge{self: cur.IDs[i], by: cur.IDs[1-i]} })
 				}
 				dodges.Drain(func(i command.Issued[dodge]) {
 					who := 0

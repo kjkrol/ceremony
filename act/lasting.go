@@ -89,14 +89,16 @@ func (l loop[P]) topNode() steps.Step {
 // topper is a part at the top of a plan, checked as one
 type topper interface{ topNode() steps.Step }
 
-func topNode(s Lasting) steps.Step {
+// TopNode is root laid out as the top of a plan, each part at the top checked as one; for
+// package plan.
+func TopNode(s Lasting) steps.Step {
 	if t, ok := s.(topper); ok {
 		return t.topNode()
 	}
 	if g, ok := s.(group); ok {
 		nodes := make([]steps.Step, len(g.parts))
 		for i, p := range g.parts {
-			nodes[i] = topNode(p)
+			nodes[i] = TopNode(p)
 		}
 		if g.first {
 			return steps.NewFirst("", nodes...)

@@ -7,14 +7,14 @@ import (
 	"github.com/kjkrol/ceremony/command"
 	"github.com/kjkrol/ceremony/effect"
 	"github.com/kjkrol/ceremony/fact"
-	"github.com/kjkrol/goke/v3"
+	"github.com/kjkrol/ceremony/store"
 	"github.com/kjkrol/uid"
 )
 
 // Pass is what a rule is told of the pass it fires in.
 type Pass struct {
 	Commands *command.Carrier
-	Effects  *effect.Effects
+	Effects  effect.Runtime
 	Dt       time.Duration
 	Time     time.Duration // game time at the step's end
 	Seed     uint64
@@ -33,7 +33,7 @@ func (c *ctx) rolesOf(id uid.UID64) uint64 {
 	return roles(id)
 }
 
-func (c *ctx) effects() *effect.Effects {
+func (c *ctx) effects() effect.Runtime {
 	if c.sys != nil {
 		return c.sys.effects
 	}
@@ -50,7 +50,7 @@ type placed interface{ Placed() }
 // Instant is a rule laid out for running at a moment, every step of it done within the pass.
 type Instant struct {
 	tree *tree
-	mind Mind
+	mind store.Mind
 	c    ctx
 }
 
@@ -75,9 +75,9 @@ func NewInstant(name string, root Step, payload any) *Instant {
 
 // Fire runs the rule once for id (entity false: for nobody), an Aimed command of it at subject
 // when about.
-func (r *Instant) Fire(p Pass, cb *goke.CmdBuf, id uid.UID64, entity bool, subject uid.UID64, about bool) {
+func (r *Instant) Fire(p Pass, id uid.UID64, entity bool, subject uid.UID64, about bool) {
 	c := &r.c
-	c.pass, c.cb, c.prev, c.next = p, cb, StepSet{}, StepSet{}
+	c.pass, c.prev, c.next = p, store.StepSet{}, store.StepSet{}
 	c.id, c.me, c.entity, c.subject, c.about = id, id, entity, subject, about
 	c.run(0)
 }

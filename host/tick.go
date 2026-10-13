@@ -5,17 +5,15 @@ import (
 
 	"github.com/kjkrol/ceremony/command"
 	"github.com/kjkrol/ceremony/effect"
-	"github.com/kjkrol/goke/v3"
 	"github.com/kjkrol/uid"
 )
 
 // Tick is what a host tells the rules it runs about its pass.
 type Tick struct {
-	CmdBuf   *goke.CmdBuf
 	Now      time.Time // read once for the whole pass
 	Dt       time.Duration
 	Commands *command.Carrier
-	Effects  *effect.Effects
+	Effects  effect.Runtime
 	Time     time.Duration // game time at the step's end
 	Seed     uint64
 	World    uid.UID64 // the world's own entity
@@ -27,14 +25,14 @@ type Tick struct {
 }
 
 // TickSource builds the Tick of a pass.
-type TickSource func(cb *goke.CmdBuf, dt time.Duration) Tick
+type TickSource func(dt time.Duration) Tick
 
 // Of is the Tick of a pass over dt; with no source, one of no world.
-func (f TickSource) Of(cb *goke.CmdBuf, dt time.Duration) Tick {
+func (f TickSource) Of(dt time.Duration) Tick {
 	if f == nil {
-		return Tick{CmdBuf: cb, Now: time.Now(), Dt: dt}
+		return Tick{Now: time.Now(), Dt: dt}
 	}
-	return f(cb, dt)
+	return f(dt)
 }
 
 const maxFamilies = 8

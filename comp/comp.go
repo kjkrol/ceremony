@@ -3,31 +3,19 @@ package comp
 import (
 	"reflect"
 	"unsafe"
-
-	"github.com/kjkrol/goke/v3"
-	"github.com/kjkrol/uid"
 )
 
 // Comp is one component of a kind's Spec — made with Const, Load, Tagged or Without, never
-// implemented by a game. Its methods are the spawning world's way in.
+// implemented by a game. Its methods are the spawning store's way in.
 type Comp interface {
-	Spawner() Spawner
-	LoadToken() goke.CompToken
-	rowType() reflect.Type
-	compType() reflect.Type
+	// Type is the component type the Comp stands for.
+	Type() reflect.Type
+	// Row is the row type a Load reads, nil for a component that reads none.
+	Row() reflect.Type
+	// Fill writes the component's value for the entity row describes into dst, a value of
+	// Type the store laid out.
+	Fill(dst unsafe.Pointer, row any)
 }
-
-// Spawner writes one component onto the entities a world spawns — what a world asks a Comp for.
-type Spawner interface {
-	Columns() []goke.Addable
-	Write(cursor *goke.Cursor, i int, row any, id uid.UID64)
-}
-
-// TypeOf is the component type c stands for.
-func TypeOf(c Comp) reflect.Type { return c.compType() }
-
-// RowOf is the row type a Load reads, nil for a component that reads none.
-func RowOf(c Comp) reflect.Type { return c.rowType() }
 
 // Template yields one component value per spawned entity.
 type Template[T any] struct {
@@ -50,25 +38,16 @@ func Load[P, T any](load func(row P) T) Template[T] {
 // Resolve is the value for the entity row describes.
 func (t Template[T]) Resolve(row any) T { return t.value(row) }
 
-// Spawner is this component's column and the writing of it.
-func (t Template[T]) Spawner() Spawner { return &writer[T]{template: t} }
+// Type is T.
+func (t Template[T]) Type() reflect.Type { return reflect.TypeFor[T]() }
 
-// LoadToken names T to a save file being loaded.
-func (t Template[T]) LoadToken() goke.CompToken { return goke.LoadComp[T]() }
+// Row is the row type a Load reads, nil for a Const.
+func (t Template[T]) Row() reflect.Type { return t.row }
 
-func (t Template[T]) rowType() reflect.Type  { return t.row }
-func (t Template[T]) compType() reflect.Type { return reflect.TypeFor[T]() }
-
-type writer[T any] struct {
-	comp     goke.Comp[T]
-	template Template[T]
-}
-
-func (w *writer[T]) Columns() []goke.Addable { return []goke.Addable{&w.comp} }
-
-func (w *writer[T]) Write(cursor *goke.Cursor, i int, row any, id uid.UID64) {
-	v := w.template.Resolve(row)
+// Fill writes the value for row into dst; nothing for a T of no size.
+func (t Template[T]) Fill(dst unsafe.Pointer, row any) {
+	v := t.value(row)
 	if unsafe.Sizeof(v) > 0 {
-		w.comp.Slice(cursor)[i] = v
+		*(*T)(dst) = v
 	}
 }

@@ -28,7 +28,3 @@ func Steps(parts ...Part) Part { return part{act.LastingSteps(lasting(parts)...)
 // OneOf does as the first of its parts that does not fail: every tick from the top, an earlier
 // part taking over from a later one once it can.
 func OneOf(parts ...Part) Part { return part{act.LastingOneOf(lasting(parts)...)} }
-
-// New is the plan named name: root run in every step of the simulation, given to a kind in
-// its Spec; a loop at its top says its Name. A name defined twice in one world panics.
-func New(name string, root Part) act.Planned { return act.NewPlan(name, root.Lasting()) }

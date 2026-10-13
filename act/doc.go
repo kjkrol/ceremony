@@ -23,5 +23,5 @@
 //
 // A plan is made of what lasts over steps, in package plan, out of the same steps: every
 // [Step] is a [Lasting], and [NewWait], [NewIdle], [NewLoop], [LastingSteps], [LastingOneOf]
-// and [NewPlan] are the parts package plan builds on.
+// and [TopNode] are the parts package plan builds on.
 package act

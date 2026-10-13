@@ -1,8 +1,9 @@
-package effect
+package goke
 
 import (
 	"time"
 
+	"github.com/kjkrol/ceremony/effect"
 	"github.com/kjkrol/ceremony/tag"
 )
 
@@ -10,18 +11,13 @@ const maxEffects = 8
 
 const wideEffects = tag.MaxTagsPerFamily - 1
 
-type effectID uint8
-
-// Forever is the Left of a slot that lasts until Dispel.
-const Forever = time.Duration(-1)
-
 // Active is what an entity is under: up to eight effects, saved with the entity.
 type Active struct {
 	Slots [maxEffects]effectSlot
 }
 
 type effectSlot struct {
-	Kind      effectID
+	Kind      uint8
 	Left      time.Duration
 	State     slotState
 	Dispelled bool // its Then is not cast
@@ -41,11 +37,11 @@ type Wide struct {
 	Slots [wideEffects]effectSlot
 }
 
-func has(slots []effectSlot, effect effectID) bool { return slotOf(slots, effect) >= 0 }
+func has(slots []effectSlot, kind uint8) bool { return slotOf(slots, kind) >= 0 }
 
-func slotOf(slots []effectSlot, effect effectID) int {
+func slotOf(slots []effectSlot, kind uint8) int {
 	for i, s := range slots {
-		if s.State != slotEmpty && s.Kind == effect {
+		if s.State != slotEmpty && s.Kind == kind {
 			return i
 		}
 	}
@@ -68,4 +64,11 @@ func empty(slots []effectSlot) bool {
 		}
 	}
 	return true
+}
+
+func lastsOf(d *effect.Definition) time.Duration {
+	if d.Lasts > 0 {
+		return d.Lasts
+	}
+	return effect.Forever
 }

@@ -25,4 +25,10 @@
 // [Self] has every step a rule's act.Self has, and [Entity.Wait] and [Entity.Idle], which
 // last; [Other] is act.Other. A rule's steps and groups (act.Self.Do, act.Steps) are parts of
 // a plan too; a plan's are not a rule's.
+//
+// # Plans
+//
+// [New] makes a [Planned], the plan's mind as a kind's component; [Plans] runs every plan
+// registered on it ([Plans.Register]) over the entities a store's binding hands it
+// ([Plans.Bind], [Plans.Tick]) on the clock and the seed it was made with ([NewPlans]).
 package plan

@@ -1,6 +1,6 @@
 // Package host is the pass's side of the rules: a pass that perceives a moment of its entities
-// keeps a host of that moment, binds it into its query and runs it over every chunk, and the
-// host runs the rules given to it. A rule of a moment no host in use catches is an error, never
+// keeps a host of that moment, binds it to the columns of its query (store.Columns) and runs it
+// over every block of entities (store.Row), and the host runs the rules given to it. A rule of a moment no host in use catches is an error, never
 // a silent no-op.
 //
 // # Moments
@@ -16,5 +16,6 @@
 // the tag families the rules name ([Side], [Marks]); [StepRules] runs rules of a moment of the
 // whole once a step. Each is a [Host]: Add takes a rule or refuses it with [ErrUnhosted], and
 // after Bind with [ErrHostBuilt]. [Tick] is what a host tells its rules of the pass: the
-// commands' carrier, the effects, the time, the seed, the places round and the roles played.
+// commands' carrier, the effects' runtime, the time, the seed, the places round and the roles
+// played.
 package host

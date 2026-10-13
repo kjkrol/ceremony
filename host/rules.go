@@ -2,54 +2,24 @@ package host
 
 import (
 	"fmt"
-	"reflect"
 
-	"github.com/kjkrol/goke/v3"
+	"github.com/kjkrol/ceremony/store"
 )
 
-// Columns are the optional columns of a host's query, by component, shared by the rules over
-// one component and the system's own reading of it (Own).
-type Columns struct {
-	qb   *goke.QueryBuilder
-	cols map[reflect.Type]any
-}
-
-// Of is the column of T, made optional in the query at its first.
-func (c *Columns) Of[T any]() *goke.OptComp[T] {
-	key := reflect.TypeFor[T]()
-	if col, ok := c.cols[key]; ok {
-		return col.(*goke.OptComp[T])
-	}
-	col := &goke.OptComp[T]{}
-	c.qb.Optional(col)
-	c.cols[key] = col
-	return col
-}
-
 type eachRule[P any] interface {
-	BindColumns(cols *Columns)
-	RunEach(t Tick, cursor *goke.Cursor, keep func(i int) bool, about func(i int) P)
+	BindColumns(cols store.Columns)
+	RunEach(t Tick, row store.Row, n int, keep func(i int) bool, about func(i int) P)
 }
 
 type onceRule[P any] interface {
 	RunOnce(t Tick, about P)
 }
 
-// Rules are the rules of a moment P a plugin runs in the pass over its entities it makes anyway:
-// Bind them into its query in Init, Run them over each chunk in Update.
+// Rules are the rules of a moment P a pass runs over the entities it walks anyway: Bind them
+// to the columns of its query as it is built, Run them over each block of entities.
 type Rules[P any] struct {
 	rules []eachRule[P]
-	own   []func(cols *Columns)
 	bound bool
-}
-
-// Own has the system read the component T itself through col, shared with the rules over T.
-// Call it before Bind.
-func Own[T, P any](r *Rules[P], col *goke.OptComp[T]) {
-	r.own = append(r.own, func(cols *Columns) {
-		cols.qb.Optional(col)
-		cols.cols[reflect.TypeFor[T]()] = col
-	})
 }
 
 // Empty reports whether no rule was added.
@@ -69,27 +39,24 @@ func (r *Rules[P]) Add(rule any) error {
 	return nil
 }
 
-// Bind adds what the rules read to the system's query. Call it once, before the query is built.
-func (r *Rules[P]) Bind(qb *goke.QueryBuilder) {
+// Bind binds what the rules read to the columns of the pass's query. Call it once, as the
+// query is built.
+func (r *Rules[P]) Bind(cols store.Columns) {
 	r.bound = true
-	cols := &Columns{qb: qb, cols: map[reflect.Type]any{}}
-	for _, own := range r.own {
-		own(cols)
-	}
 	for _, each := range r.rules {
 		each.BindColumns(cols)
 	}
 }
 
-// Run runs every rule over the chunk being walked; about(i) is the moment of its i-th entity.
-func (r *Rules[P]) Run(t Tick, cursor *goke.Cursor, about func(i int) P) {
-	r.RunWhere(t, cursor, nil, about)
+// Run runs every rule over a block of n entities; about(i) is the moment of its i-th entity.
+func (r *Rules[P]) Run(t Tick, row store.Row, n int, about func(i int) P) {
+	r.RunWhere(t, row, n, nil, about)
 }
 
-// RunWhere is Run over the entities of the chunk keep lets through: a moment only some have.
-func (r *Rules[P]) RunWhere(t Tick, cursor *goke.Cursor, keep func(i int) bool, about func(i int) P) {
+// RunWhere is Run over the entities of the block keep lets through: a moment only some have.
+func (r *Rules[P]) RunWhere(t Tick, row store.Row, n int, keep func(i int) bool, about func(i int) P) {
 	for _, each := range r.rules {
-		each.RunEach(t, cursor, keep, about)
+		each.RunEach(t, row, n, keep, about)
 	}
 }
 

@@ -204,7 +204,7 @@ type wordGuard[P any] struct {
 	carried *carried[P]
 }
 
-func (g *wordGuard[P]) bind(s *system) {
+func (g *wordGuard[P]) bind(s *Plans) {
 	if reflect.TypeFor[P]() != reflect.TypeFor[any]() {
 		g.carried = carriedOf[P](s)
 	}
@@ -233,7 +233,7 @@ type cameGuard[F any] struct {
 	carried *carried[F]
 }
 
-func (g *cameGuard[F]) bind(s *system) { g.carried = carriedOf[F](s) }
+func (g *cameGuard[F]) bind(s *Plans) { g.carried = carriedOf[F](s) }
 
 // the bit says the fact was absent since the loop began: present now, it came
 func (g *cameGuard[F]) holds(c *ctx, at int) bool {
@@ -251,7 +251,7 @@ func (g *cameGuard[F]) sign() string {
 	return fmt.Sprintf("came[%s](%d,%s)", typeName[F](), g.k, g.w.sign())
 }
 
-func bindGuard(g Guard, s *system) {
+func bindGuard(g Guard, s *Plans) {
 	if b, ok := g.(binder); ok {
 		b.bind(s)
 	}
@@ -261,11 +261,11 @@ type notGuard struct{ g Guard }
 
 func (g notGuard) holds(c *ctx, at int) bool { return !g.g.holds(c, at) }
 func (g notGuard) sign() string              { return "not" + g.g.sign() }
-func (g notGuard) bind(s *system)            { bindGuard(g.g, s) }
+func (g notGuard) bind(s *Plans)             { bindGuard(g.g, s) }
 
 type allGuard struct{ gs []Guard }
 
-func (g allGuard) bind(s *system) {
+func (g allGuard) bind(s *Plans) {
 	for _, k := range g.gs {
 		bindGuard(k, s)
 	}
@@ -284,7 +284,7 @@ func (g allGuard) sign() string { return "all(" + signs(g.gs) + ")" }
 
 type anyGuard struct{ gs []Guard }
 
-func (g anyGuard) bind(s *system) {
+func (g anyGuard) bind(s *Plans) {
 	for _, k := range g.gs {
 		bindGuard(k, s)
 	}
@@ -329,7 +329,7 @@ func NewBranch[P any](name string, guard Guard, node Step, until Guard) Step {
 
 type untilNode struct{ g Guard }
 
-func (u untilNode) bind(s *system)       { bindGuard(u.g, s) }
+func (u untilNode) bind(s *Plans)        { bindGuard(u.g, s) }
 func (u untilNode) enter(c *ctx, at int) { c.mind.Slot[at] = 0 }
 func (untilNode) halt(*ctx, int)         {}
 
@@ -368,7 +368,7 @@ func (b *branch[P]) refuses(payload any) string {
 	return ""
 }
 
-func (b *branch[P]) bind(s *system) {
+func (b *branch[P]) bind(s *Plans) {
 	if b.onFact() {
 		b.carried = carriedOf[P](s)
 	}

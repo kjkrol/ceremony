@@ -10,11 +10,12 @@ import (
 	"github.com/kjkrol/ceremony"
 	"github.com/kjkrol/ceremony/act"
 	"github.com/kjkrol/ceremony/command"
-	"github.com/kjkrol/ceremony/comp"
 	"github.com/kjkrol/ceremony/cond"
 	"github.com/kjkrol/ceremony/host"
 	"github.com/kjkrol/ceremony/tag"
 	"github.com/kjkrol/goke/v3"
+
+	cgoke "github.com/kjkrol/ceremony/goke"
 	"github.com/kjkrol/uid"
 )
 
@@ -61,9 +62,9 @@ func (b being) roles() uint64 {
 func spawnBeing(si *goke.SysInit, b being) uid.UID64 {
 	var bodies goke.Comp[body]
 	columns := []goke.Addable{&bodies}
-	var plays comp.Spawner
+	var plays *cgoke.Spawner
 	if !b.bare {
-		plays = ceremony.Plays(b.plays...).Spawner()
+		plays = cgoke.NewSpawner(ceremony.Plays(b.plays...))
 		columns = append(columns, plays.Columns()...)
 	}
 	f := si.NewFactory(columns...)
@@ -71,7 +72,7 @@ func spawnBeing(si *goke.SysInit, b being) uid.UID64 {
 	f.Next()
 	id := f.Cursor.IDs[0]
 	if plays != nil {
-		plays.Write(&f.Cursor, 0, nil, id)
+		plays.Write(&f.Cursor, 0, nil)
 	}
 	return id
 }
@@ -122,13 +123,14 @@ func TestRole_Obeys_NarrowsEachRuleToItsPlayers(t *testing.T) {
 		}
 		var bodies goke.Comp[body]
 		qb := si.NewQueryBuilder(&bodies)
-		h.Bind(qb)
+		cols := cgoke.NewColumns(qb)
+		h.Bind(cols)
 		walk := qb.Build()
 		tick := host.Tick{Dt: time.Millisecond, Commands: carrier,
 			Roles: func(id uid.UID64) uint64 { return roles[id] }}
 		for walk.All(); walk.Next(); {
 			cur := walk.Cursor()
-			h.Run(tick, cur, func(i int) standing { return standing{who: cur.IDs[i]} })
+			h.Run(tick, cols.Row(cur), len(cur.IDs), func(i int) standing { return standing{who: cur.IDs[i]} })
 		}
 	}})
 	got := map[string][]string{}
@@ -189,11 +191,12 @@ func TestRole_Obeys_NarrowsAPairRuleToItsPlayers(t *testing.T) {
 				}
 				var bodies goke.Comp[body]
 				qb := si.NewQueryBuilder(&bodies)
-				h.Bind(qb)
+				cols := cgoke.NewColumns(qb)
+				h.Bind(cols)
 				walk := qb.Build()
 				for walk.All(); walk.Next(); {
 					for i, id := range walk.Cursor().IDs {
-						marks[id] = h.InChunk(0, walk.Cursor(), i)
+						marks[id] = h.Read(0, cols.Row(walk.Cursor()), i)
 					}
 				}
 			}})
@@ -279,7 +282,7 @@ func TestRole_Rules_AreItsOwnNarrowedInOrder(t *testing.T) {
 func TestPlays_IsOneComponentCarryingEveryRole(t *testing.T) {
 	mortal, hasty := Role("mortal"), Role("hasty")
 	plays := ceremony.Plays(mortal, hasty)
-	if got, want := comp.TypeOf(plays), reflect.TypeFor[tag.Tags[cond.Roles]](); got != want {
+	if got, want := plays.Type(), reflect.TypeFor[tag.Tags[cond.Roles]](); got != want {
 		t.Fatalf("Plays is a %v; want a %v", got, want)
 	}
 	want := tag.Tags[cond.Roles](0).With(mortalTag, hastyTag)

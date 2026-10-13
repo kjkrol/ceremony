@@ -12,6 +12,8 @@ import (
 	"github.com/kjkrol/ceremony/host"
 	"github.com/kjkrol/ceremony/tag"
 	"github.com/kjkrol/goke/v3"
+
+	cgoke "github.com/kjkrol/ceremony/goke"
 	"github.com/kjkrol/uid"
 )
 
@@ -163,11 +165,12 @@ func firedFor(t *testing.T, r act.Rule, kits ...kit) []int {
 		ids = spawn(si, kits)
 		var tokens goke.Comp[token]
 		qb := si.NewQueryBuilder(&tokens)
-		h.Bind(qb)
+		cols := cgoke.NewColumns(qb)
+		h.Bind(cols)
 		q := qb.Build()
 		for q.All(); q.Next(); {
 			cur := q.Cursor()
-			h.Run(k.tick(), cur, func(i int) poke { return poke{self: cur.IDs[i]} })
+			h.Run(k.tick(), cols.Row(cur), len(cur.IDs), func(i int) poke { return poke{self: cur.IDs[i]} })
 		}
 	}})
 	return k.who(ids)
@@ -181,12 +184,13 @@ func marksOf[P any](t *testing.T, h *host.PairRules[P], kits ...kit) ([]host.Mar
 		ids = spawn(si, kits)
 		var tokens goke.Comp[token]
 		qb := si.NewQueryBuilder(&tokens)
-		h.Bind(qb)
+		cols := cgoke.NewColumns(qb)
+		h.Bind(cols)
 		q := qb.Build()
 		for q.All(); q.Next(); {
 			cur := q.Cursor()
 			for i, id := range cur.IDs {
-				marks[slices.Index(ids, id)] = h.InChunk(0, cur, i)
+				marks[slices.Index(ids, id)] = h.Read(0, cols.Row(cur), i)
 			}
 		}
 	}})
@@ -536,12 +540,13 @@ func TestWithin_RunWhereKeepsToWhatKeepLetsThrough(t *testing.T) {
 				ids = spawn(si, kits)
 				var tokens goke.Comp[token]
 				qb := si.NewQueryBuilder(&tokens)
-				h.Bind(qb)
+				cols := cgoke.NewColumns(qb)
+				h.Bind(cols)
 				q := qb.Build()
 				for q.All(); q.Next(); {
 					cur := q.Cursor()
 					keep := func(i int) bool { return cur.IDs[i] != ids[0] } // the first hunter struck nothing
-					h.RunWhere(k.tick(), cur, keep, func(i int) poke { return poke{self: cur.IDs[i]} })
+					h.RunWhere(k.tick(), cols.Row(cur), len(cur.IDs), keep, func(i int) poke { return poke{self: cur.IDs[i]} })
 				}
 			}})
 			if got := k.who(ids); !slices.Equal(got, []int{1}) {

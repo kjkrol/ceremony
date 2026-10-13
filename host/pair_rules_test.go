@@ -7,6 +7,8 @@ import (
 	"github.com/kjkrol/ceremony/host"
 	"github.com/kjkrol/ceremony/tag"
 	"github.com/kjkrol/goke/v3"
+
+	cgoke "github.com/kjkrol/ceremony/goke"
 	"github.com/kjkrol/uid"
 )
 
@@ -42,20 +44,21 @@ func hostOf(t *testing.T, rules ...any) (h *host.PairRules[sighting], hunterMark
 
 		var walked, sought goke.Comp[hostBody]
 		walk, seek := si.NewQueryBuilder(&walked), si.NewQueryBuilder(&sought)
-		h.Bind(walk, seek)
+		wc, sc := cgoke.NewColumns(walk), cgoke.NewColumns(seek)
+		h.Bind(wc, sc)
 		walking, seeking := walk.Build(), seek.Build()
 
 		for walking.All(); walking.Next(); {
 			for i, id := range walking.Cursor().IDs {
 				if id == pair.from {
-					hunterMarks = h.InChunk(0, walking.Cursor(), i)
+					hunterMarks = h.Read(0, wc.Row(walking.Cursor()), i)
 				}
 			}
 		}
 		if !seeking.Seek(pair.to) {
 			t.Fatal("the hunted entity could not be sought")
 		}
-		huntedMarks = h.At(1, seeking.Cursor())
+		huntedMarks = h.Read(1, sc.Row(seeking.Cursor()), int(seeking.Cursor().Slot))
 	}})
 	return h, hunterMarks, huntedMarks, pair
 }

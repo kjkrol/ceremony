@@ -6,7 +6,6 @@ import (
 
 	"github.com/kjkrol/ceremony/command"
 	"github.com/kjkrol/ceremony/fact"
-	"github.com/kjkrol/goke/v3"
 	"github.com/kjkrol/uid"
 )
 
@@ -40,17 +39,10 @@ func (i *order[C]) refuses(any) string {
 	return ""
 }
 
-func (i *order[C]) bind(s *system) {
+func (i *order[C]) bind(s *Plans) {
 	if i.sends() {
 		i.carried = carriedOf[C](s)
 	}
-}
-
-func (i *order[C]) loads() []goke.CompToken {
-	if !i.sends() {
-		return nil
-	}
-	return []goke.CompToken{goke.LoadComp[C]()}
 }
 
 func (i *order[C]) tick(c *ctx, _ int, _ []int) Status {

@@ -10,8 +10,10 @@ value saying who, when, on whom and what, checked as it is built; the engine run
 It was carved out of a game engine, where the entities are units, cells and the sky, and reads as
 well over orders, tickets and cases: an entity is a case, a fact an event, a state a status with a
 duration, a role a policy, a rule a reaction, a plan a workflow with its waits, a command a
-service call. The store of state is [goke](https://github.com/kjkrol/goke), an ECS: facts,
-states, roles and minds are components on the entity. A store interface is the next step.
+service call. The store of state is behind a contract (`store`): the engine reads an entity's
+facts and tags off the blocks a store hands it and writes into the places it stages; the one
+binding is `ceremony/goke`, over the [goke](https://github.com/kjkrol/goke) ECS, the one package
+that imports it.
 
 ## The dictionary
 
@@ -110,20 +112,24 @@ of its type is the answer. The language is in [doc/ceremony.md](doc/ceremony.md)
   who an entity is called).
 - **The engine** — `internal/steps` runs the trees of steps on minds and at moments; `host` is
   the pass's side: the hosts of rules and the `Tick` they hand the rules.
-- **The store** — goke, for now: a fact, a state (`effect.Active`, its markers), a role
-  (`tag.Tags[cond.Roles]`), a mind are components; `comp` names a component for a kind's
-  template, `tag` the families of bits.
+- **The store** — `store` is the contract: a `Row` is a block of entities, an array a column,
+  which the engine indexes and nothing else; `Facts` stages what it writes; `Mind` is a plan's
+  state on the entity. `comp` names a component for a kind's template, `tag` the families of
+  bits. `goke` is the binding over the goke ECS: its `Columns` hand the engine each chunk's
+  arrays out of goke's own accessors, its `Effects` run the effects, its `Plans` the plans, its
+  `Spawner` writes a kind's components, all through goke's queries and command buffers.
 - **Commands** — `command`: a queue a type, a carrier that sorts them, an issuer.
 
 ## Plugging in
 
 - **Perceive**: write a moment type (`Who()` the entity; `Whom` for a pair, `Placed()` for one
   standing on places), keep a `host.Rules[M]` (`PairRules` for pairs, `StepRules` for a moment
-  of the whole), `Bind` it into the pass's query and `Run` it over every chunk with a `host.Tick`.
+  of the whole), `Bind` it to the columns of the pass's query (`goke.NewColumns(qb)`) and `Run`
+  it over every chunk (`cols.Row(cursor)`) with a `host.Tick`.
 - **Tell facts**: put a component marked `fact.Fact` on the entity when the thing happens and
   take it off when it is over; plans begin on it and wait for it.
-- **Define states and roles**: `effect.New(name)` then `Define(name, effect.Spec{...})` and
-  install its `Module()`; `ceremony.NewPart(name, tag).Obeys(rules...)`; a kind carries
+- **Define states and roles**: `effect.New(name)` then `Define(name, effect.Spec{...})`, run
+  by the binding (`goke.NewEffects(register)`, its `Module()` installed); `ceremony.NewPart(name, tag).Obeys(rules...)`; a kind carries
   `ceremony.Plays(roles...)`; `ceremony.Deliver(hosts, roles...)` hands every rule to the host
   that catches its moment, failing with `host.ErrUnhosted` for one none does.
 - **Carry commands**: a `command.Queue[C]` a type, given to a `command.Carrier`, which the

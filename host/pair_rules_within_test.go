@@ -8,6 +8,8 @@ import (
 	"github.com/kjkrol/ceremony/host"
 	"github.com/kjkrol/ceremony/tag"
 	"github.com/kjkrol/goke/v3"
+
+	cgoke "github.com/kjkrol/ceremony/goke"
 )
 
 const leader = hunted + 1
@@ -78,12 +80,13 @@ func hostWithin[P any](t *testing.T, rules []any, whom ...carrying) (*host.PairR
 
 		var walked goke.Comp[hostBody]
 		walk := si.NewQueryBuilder(&walked)
-		h.Bind(walk)
+		cols := cgoke.NewColumns(walk)
+		h.Bind(cols)
 		walking := walk.Build()
 		for walking.All(); walking.Next(); {
 			cursor := walking.Cursor()
 			for i := range cursor.IDs {
-				marks[walked.Slice(cursor)[i].N] = h.InChunk(0, cursor, i)
+				marks[walked.Slice(cursor)[i].N] = h.Read(0, cols.Row(cursor), i)
 				read++
 			}
 		}

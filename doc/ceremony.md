@@ -89,7 +89,7 @@ actor   = act.Self | act.Other | act.Around(n)   // in a plan: plan.Self, plan.O
   `Around` where `P` is not `host.Placed`, a Branch of another moment inside, a message, a Branch
   at the top of a rule without a `Name`. A plan's parts — `Wait`, `Idle`, a Loop — do not
   compile in a rule's `Then`.
-- `plan.New(name, root)` is a plan, an `act.Planned`: the component its entities carry, their
+- `plan.New(name, root)` is a plan, a `plan.Planned`: the component its entities carry, their
   mind, and the plan defined under the name a save knows it by, run in every step. `OneOf` is
   run every step, from the top, the first loop whose When holds; an earlier one, once it can,
   takes over from a later one, which is stopped. `Steps` runs its parts one after another and
@@ -111,7 +111,7 @@ actor   = act.Self | act.Other | act.Around(n)   // in a plan: plan.Self, plan.O
   `Wait(d)` and `Idle()` are steps of `plan.Self` alone; an `Until` of `Other` is refused. A rule
   runs in one pass and has none of them.
 - A function writing part of a rule returns an `act.Step`, part of a plan a `plan.Part`, a whole
-  rule an `act.Rule`, a whole plan an `act.Planned`. The one who perceives ships no ready-made
+  rule an `act.Rule`, a whole plan a `plan.Planned`. The one who perceives ships no ready-made
   reactions: it gives moments and their words, the user writes the rule.
 
 ## Conditions

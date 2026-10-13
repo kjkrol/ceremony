@@ -4,15 +4,14 @@ import (
 	"fmt"
 	"reflect"
 
+	"github.com/kjkrol/ceremony/store"
 	"github.com/kjkrol/ceremony/tag"
-	"github.com/kjkrol/goke/v3"
 )
 
 // Side is one side of a pair rule: a tag of a family, or anybody.
 type Side struct {
-	family reflect.Type // nil: anybody
+	family reflect.Type // the family's component type, tag.Tags[F]; nil: anybody
 	bit    uint8
-	probe  func() familyProbe
 }
 
 // Anybody reports a side of no tag, which anybody is.
@@ -23,7 +22,7 @@ func SideOf[F any](t tag.Tag[F]) Side {
 	if reflect.TypeFor[F]() == reflect.TypeFor[tag.Anything]() {
 		return Side{}
 	}
-	return Side{family: reflect.TypeFor[F](), bit: uint8(t), probe: func() familyProbe { return &probe[F]{} }}
+	return Side{family: reflect.TypeFor[tag.Tags[F]](), bit: uint8(t)}
 }
 
 type pairRule[P any] interface {
@@ -54,12 +53,12 @@ func (p *paired[P]) first(m Marks) bool {
 	return true
 }
 
-// PairRules are the rules of a moment P of two entities a plugin runs in its pass: it reads the
-// tag families the rules name, eight at most, off the entities (InChunk, At) and dispatches each
-// pair to the rules whose sides it carries.
+// PairRules are the rules of a moment P of two entities a pass runs: it reads the tag families
+// the rules name, eight at most, off the entities (Read) and dispatches each pair to the rules
+// whose sides it carries.
 type PairRules[P any] struct {
-	families []familyProbe
-	kinds    []reflect.Type
+	families []reflect.Type
+	cols     [][]store.Col // by query, by family
 	rules    []paired[P]
 	bound    bool
 	matched  []int // scratch
@@ -98,7 +97,7 @@ func (r *PairRules[P]) familyOf(s Side) int {
 	if s.family == nil {
 		return -1
 	}
-	for i, known := range r.kinds {
+	for i, known := range r.families {
 		if known == s.family {
 			return i
 		}
@@ -106,34 +105,31 @@ func (r *PairRules[P]) familyOf(s Side) int {
 	if len(r.families) == maxFamilies {
 		panic(fmt.Sprintf("plugin: pair rules name more than %d tag families", maxFamilies))
 	}
-	r.families = append(r.families, s.probe())
-	r.kinds = append(r.kinds, s.family)
+	r.families = append(r.families, s.family)
 	return len(r.families) - 1
 }
 
-// Bind adds every family the rules name to each of the system's queries. Call it once, before
-// they are built.
-func (r *PairRules[P]) Bind(queries ...*goke.QueryBuilder) {
+// Bind binds every family the rules name to the columns of each of the pass's queries, one
+// Columns a query, in the order Read takes them. Call it once, as they are built.
+func (r *PairRules[P]) Bind(queries ...store.Columns) {
 	r.bound = true
-	for _, f := range r.families {
-		f.bind(queries)
+	r.cols = make([][]store.Col, len(queries))
+	for q, cols := range queries {
+		r.cols[q] = make([]store.Col, len(r.families))
+		for k, f := range r.families {
+			r.cols[q][k] = cols.Column(f)
+		}
 	}
 }
 
-// InChunk is what the i-th entity of the chunk being walked on query carries.
-func (r *PairRules[P]) InChunk(query int, cursor *goke.Cursor, i int) Marks {
+// Read is what the i-th entity of a block of the query-th query carries; in Seek mode i is the
+// cursor's slot.
+func (r *PairRules[P]) Read(query int, row store.Row, i int) Marks {
 	var words [maxFamilies]uint64
-	for k, f := range r.families {
-		words[k] = f.inChunk(query, cursor, i)
-	}
-	return Marks{words: words}
-}
-
-// At is what the entity just sought on query carries.
-func (r *PairRules[P]) At(query int, cursor *goke.Cursor) Marks {
-	var words [maxFamilies]uint64
-	for k, f := range r.families {
-		words[k] = f.at(query, cursor)
+	for k, col := range r.cols[query] {
+		if p := row.At(col, i); p != nil {
+			words[k] = *(*uint64)(p)
+		}
 	}
 	return Marks{words: words}
 }
@@ -185,35 +181,4 @@ func (r *PairRules[P]) DispatchEitherWay(t Tick, a, b Marks, forward, backward P
 			p.rule.RunPair(t, backward)
 		}
 	}
-}
-
-type familyProbe interface {
-	bind(queries []*goke.QueryBuilder)
-	inChunk(query int, cursor *goke.Cursor, i int) uint64
-	at(query int, cursor *goke.Cursor) uint64
-}
-
-type probe[F any] struct {
-	comps []goke.OptComp[tag.Tags[F]] // one a query; never grown once bound
-}
-
-func (p *probe[F]) bind(queries []*goke.QueryBuilder) {
-	p.comps = make([]goke.OptComp[tag.Tags[F]], len(queries))
-	for i, qb := range queries {
-		qb.Optional(&p.comps[i])
-	}
-}
-
-func (p *probe[F]) inChunk(query int, cursor *goke.Cursor, i int) uint64 {
-	if !p.comps[query].Present(cursor) {
-		return 0
-	}
-	return uint64(p.comps[query].Slice(cursor)[i])
-}
-
-func (p *probe[F]) at(query int, cursor *goke.Cursor) uint64 {
-	if v := p.comps[query].At(cursor); v != nil {
-		return uint64(*v)
-	}
-	return 0
 }

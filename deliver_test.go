@@ -13,6 +13,8 @@ import (
 	"github.com/kjkrol/ceremony/host"
 	"github.com/kjkrol/ceremony/tag"
 	"github.com/kjkrol/goke/v3"
+
+	cgoke "github.com/kjkrol/ceremony/goke"
 	"github.com/kjkrol/uid"
 )
 
@@ -154,7 +156,7 @@ func TestDeliver_StopsAtAHostAlreadyBuilt(t *testing.T) {
 	bound := &host.Rules[poke]{}
 	goke.New().Setup(goke.SystemFn{OnInit: func(si *goke.SysInit) {
 		var tokens goke.Comp[token]
-		bound.Bind(si.NewQueryBuilder(&tokens))
+		bound.Bind(cgoke.NewColumns(si.NewQueryBuilder(&tokens)))
 	}})
 	built := &keeper{name: "built", adds: bound}
 	later := &keeper{name: "later", adds: &host.Rules[poke]{}}

@@ -1,12 +1,16 @@
 package host_test
 
 import (
+	"reflect"
 	"testing"
 	"time"
 
 	"github.com/kjkrol/ceremony/host"
+	"github.com/kjkrol/ceremony/store"
 	"github.com/kjkrol/ceremony/tag"
 	"github.com/kjkrol/goke/v3"
+
+	cgoke "github.com/kjkrol/ceremony/goke"
 )
 
 type moment struct{ i int }
@@ -19,9 +23,6 @@ func TestRules_TriggersOverOneComponentShareItsColumn(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	var own goke.OptComp[hostBody]
-	host.Own(h, &own)
-	var read int
 	ecs := goke.New()
 	ecs.Setup(goke.SystemFn{OnInit: func(si *goke.SysInit) {
 		var bodies goke.Comp[hostBody]
@@ -32,16 +33,19 @@ func TestRules_TriggersOverOneComponentShareItsColumn(t *testing.T) {
 			bodies.Slice(&f.Cursor)[i].N = 1
 		}
 		qb := si.NewQueryBuilder()
-		h.Bind(qb)
+		cols := cgoke.NewColumns(qb)
+		h.Bind(cols)
+		if own := cols.Column(reflect.TypeFor[hostBody]()); own.Idx != 0 {
+			t.Errorf("the two rules' column of hostBody is at %d; want one column, the first", own.Idx)
+		}
 		q := qb.Build()
 		for q.All(); q.Next(); {
 			cur := q.Cursor()
-			read += len(own.Slice(cur))
-			h.Run(host.Tick{Dt: time.Millisecond}, cur, func(i int) moment { return moment{i: i} })
+			h.Run(host.Tick{Dt: time.Millisecond}, cols.Row(cur), len(cur.IDs), func(i int) moment { return moment{i: i} })
 		}
 	}})
-	if seen != [2]int{3, 3} || read != 3 {
-		t.Errorf("the rules saw %v, the host read %d; want both rules and the host on all 3", seen, read)
+	if seen != [2]int{3, 3} {
+		t.Errorf("the rules saw %v; want both rules on all 3", seen)
 	}
 }
 
@@ -61,10 +65,12 @@ func TestRules_RunWhereSkipsWhatKeepLeavesOut(t *testing.T) {
 		f.Create(4)
 		f.Next()
 		qb := si.NewQueryBuilder()
-		h.Bind(qb)
+		cols := cgoke.NewColumns(qb)
+		h.Bind(cols)
 		q := qb.Build()
 		for q.All(); q.Next(); {
-			h.RunWhere(host.Tick{}, q.Cursor(), func(i int) bool { return i%2 == 1 }, func(i int) moment { return moment{i: i} })
+			cur := q.Cursor()
+			h.RunWhere(host.Tick{}, cols.Row(cur), len(cur.IDs), func(i int) bool { return i%2 == 1 }, func(i int) moment { return moment{i: i} })
 		}
 	}})
 	if len(each) != 2 || each[0] != 1 || each[1] != 3 || len(every) != 2 || every[0] != 1 || every[1] != 3 {
@@ -81,30 +87,29 @@ func pairRule[FA, FB, P any](a tag.Tag[FA], b tag.Tag[FB], react func(host.Tick,
 }
 
 type eachOf[T, P any] struct {
-	col   *goke.OptComp[T]
+	col   store.Col
 	react func(host.Tick, *T, P)
 }
 
-func (e *eachOf[T, P]) BindColumns(cols *host.Columns) { e.col = cols.Of[T]() }
+func (e *eachOf[T, P]) BindColumns(cols store.Columns) { e.col = cols.Column(reflect.TypeFor[T]()) }
 
-func (e *eachOf[T, P]) RunEach(t host.Tick, cursor *goke.Cursor, keep func(i int) bool, about func(i int) P) {
-	if !e.col.Present(cursor) {
+func (e *eachOf[T, P]) RunEach(t host.Tick, row store.Row, n int, keep func(i int) bool, about func(i int) P) {
+	if row.Columns[e.col.Idx] == nil {
 		return
 	}
-	ts := e.col.Slice(cursor)
-	for i := range cursor.IDs {
+	for i := range n {
 		if keep == nil || keep(i) {
-			e.react(t, &ts[i], about(i))
+			e.react(t, (*T)(row.At(e.col, i)), about(i))
 		}
 	}
 }
 
 type everyOf[P any] struct{ react func(host.Tick, P) }
 
-func (*everyOf[P]) BindColumns(*host.Columns) {}
+func (*everyOf[P]) BindColumns(store.Columns) {}
 
-func (e *everyOf[P]) RunEach(t host.Tick, cursor *goke.Cursor, keep func(i int) bool, about func(i int) P) {
-	for i := range cursor.IDs {
+func (e *everyOf[P]) RunEach(t host.Tick, _ store.Row, n int, keep func(i int) bool, about func(i int) P) {
+	for i := range n {
 		if keep == nil || keep(i) {
 			e.react(t, about(i))
 		}

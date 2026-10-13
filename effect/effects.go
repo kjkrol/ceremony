@@ -5,44 +5,41 @@ import (
 	"time"
 
 	"github.com/kjkrol/ceremony/tag"
-	"github.com/kjkrol/goke/v3"
 	"github.com/kjkrol/uid"
 )
 
-// Effects is a Stage's register of effects, which the world makes and runs
-// (world.Plugin.Effects).
-type Effects struct {
-	defs      []def
-	originals *originals
-	name      func(name string) tag.Tag[States]
-	system    *effectSystem
-	module    *module
+// Forever is the length of a cast that lasts until Dispel.
+const Forever = time.Duration(-1)
 
-	byName map[string]effectID
+// Effects is a register of effects: their definitions, by name, which a store's binding runs.
+type Effects struct {
+	defs   []Definition
+	name   func(name string) tag.Tag[States]
+	frozen bool
+
+	byName map[string]uint8
 	marks  []tag.Tag[States] // by effect
 	guard  func(name string)
 }
 
-// New makes the effects, naming each effect's marker with name, which must give Changed first.
+// New makes the register, naming each effect's marker with name, which must give Changed
+// first.
 func New(name func(name string) tag.Tag[States]) *Effects {
 	if t := name(changedName); t != Changed {
 		panic(fmt.Sprintf("effects: the markers have tags of their own before %q", changedName))
 	}
-	e := &Effects{originals: newOriginals(), name: name}
-	e.system = newEffectSystem(&e.defs, e.originals)
-	e.module = &module{system: e.system, originals: e.originals}
-	return e
+	return &Effects{name: name}
 }
 
 const markerPrefix = "effect."
 
 // Define registers an effect under name, with its own marker on while it runs (Effect.Mark). It
-// panics once the game is set up, or past 63 effects.
+// panics once the register is frozen, or past 63 effects.
 func (e *Effects) Define(name string, spec Spec) {
 	if e.guard != nil {
 		e.guard(name)
 	}
-	if e.system.built {
+	if e.frozen {
 		panic(fmt.Sprintf("effects: %q defined after the game was set up", name))
 	}
 	if len(e.defs) == tag.MaxTagsPerFamily-1 {
@@ -52,16 +49,16 @@ func (e *Effects) Define(name string, spec Spec) {
 	if mark == Changed {
 		panic(fmt.Sprintf("effects: %q is named as Changed is", name))
 	}
-	d := def{name: name}
+	d := Definition{Name: name}
 	Grant(mark).apply(&d)
 	for _, t := range spec {
 		t.apply(&d)
 	}
 	e.defs = append(e.defs, d)
 	e.marks = append(e.marks, mark)
-	id := effectID(len(e.defs) - 1)
+	id := uint8(len(e.defs) - 1)
 	if e.byName == nil {
-		e.byName = map[string]effectID{}
+		e.byName = map[string]uint8{}
 	}
 	e.byName[name] = id
 }
@@ -87,73 +84,37 @@ func (e *Effects) Lookup(name string) (Effect, bool) {
 // Guard has Define call guard with each effect's name first.
 func (e *Effects) Guard(guard func(name string)) { e.guard = guard }
 
-// Cast puts effect on id for as long as its Spec says, landing with the effects' next pass; cast
-// again, it is refreshed unless it stacks.
-func (e *Effects) Cast(cb *goke.CmdBuf, id uid.UID64, effect Effect) {
-	e.CastFor(cb, id, effect, e.lasts(effect.id))
-}
+// Freeze closes the register: the binding calls it as it is set up, and a Define after panics.
+func (e *Effects) Freeze() { e.frozen = true }
 
-// CastFor is Cast for a set time of the clock's; Forever for one that lasts until Dispel.
-func (e *Effects) CastFor(cb *goke.CmdBuf, id uid.UID64, effect Effect, d time.Duration) {
-	e.system.cast(cb, id, effect.id, d)
-}
+// Count is how many effects are defined.
+func (e *Effects) Count() int { return len(e.defs) }
 
-// Dispel ends effect on id with the effects' next pass.
-func (e *Effects) Dispel(id uid.UID64, effect Effect) { e.system.dispel(id, effect.id) }
+// Definition is the definition of the effect with the id, for the binding; Shows may turn on
+// after the binding is set up, so it reads the definition where it stands.
+func (e *Effects) Definition(id uint8) *Definition { return &e.defs[id] }
 
-// Has reports whether id is under effect.
-func (e *Effects) Has(id uid.UID64, effect Effect) bool { return e.system.has(id, effect.id) }
-
-func (e *Effects) lasts(effect effectID) time.Duration { return lastsOf(&e.defs[effect]) }
-
-func lastsOf(d *def) time.Duration {
-	if d.lasts > 0 {
-		return d.lasts
+// Lasts is how long a cast of effect lasts by its Spec: Forever without a Lasts.
+func (e *Effects) Lasts(effect Effect) time.Duration {
+	if d := e.defs[effect.id].Lasts; d > 0 {
+		return d
 	}
 	return Forever
 }
 
-// Module is the effects as a goke.Module, for the world to install.
-func (e *Effects) Module() goke.Module { return e.module }
-
-type module struct {
-	system    *effectSystem
-	originals *originals
-	runnable  goke.Runnable
-}
-
-var _ goke.Module = (*module)(nil)
-
-// once, however many times the module is registered
-func (m *module) RegSystems(ecs *goke.ECS) {
-	if m.runnable == nil {
-		m.runnable = ecs.RegSys(m.system)
-	}
-}
-
-func (m *module) RunPlan(ctx goke.RunCtx, d time.Duration) {
-	ctx.Run(m.runnable, d)
-	ctx.Sync()
-}
-
-func (m *module) SetupSystems() []goke.System { return nil }
-
-func (m *module) LoadComps() []goke.CompToken {
-	return []goke.CompToken{goke.LoadComp[Active](), goke.LoadComp[Wide](), goke.LoadComp[tag.Tags[States]]()}
-}
-
-func (m *module) Persisted() []any { return []any{&m.originals.byEntity} }
-
 // Effect is one effect defined with its Effects: what a rule or a plan casts.
 type Effect struct {
 	owner *Effects
-	id    effectID
+	id    uint8
 	mark  tag.Tag[States]
 }
 
+// ID is the effect's place in its register, what a store's binding keeps on an entity.
+func (e Effect) ID() uint8 { return e.id }
+
 // Shows says something is drawn by the effect's marker: the entity's Changed goes on as the
 // effect begins and ends, though it alters nothing.
-func (e Effect) Shows() { e.owner.defs[e.id].shows = true }
+func (e Effect) Shows() { e.owner.defs[e.id].Shows = true }
 
 // Mark is the effect's own marker, on while it runs.
 func (e Effect) Mark() tag.Tag[States] { return e.mark }
@@ -161,5 +122,16 @@ func (e Effect) Mark() tag.Tag[States] { return e.mark }
 // Description is what the Spec's Described said of the effect, "" without one.
 func (e Effect) Description() string { return e.owner.defs[e.id].describe }
 
-// On reports whether id is under the effect.
-func (e Effect) On(id uid.UID64) bool { return e.owner.Has(id, e) }
+// Runtime is the effects as a store's binding runs them on its entities: what a rule's steps,
+// a plan's and a plugin's pass cast and ask through.
+type Runtime interface {
+	// Has reports whether id is under effect.
+	Has(id uid.UID64, effect Effect) bool
+	// Cast puts effect on id for as long as its Spec says, landing with the effects' next pass;
+	// cast again, it is refreshed unless it stacks.
+	Cast(id uid.UID64, effect Effect)
+	// CastFor is Cast for a set time of the clock's; Forever for one that lasts until Dispel.
+	CastFor(id uid.UID64, effect Effect, d time.Duration)
+	// Dispel ends effect on id with the effects' next pass.
+	Dispel(id uid.UID64, effect Effect)
+}

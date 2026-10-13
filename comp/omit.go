@@ -2,8 +2,7 @@ package comp
 
 import (
 	"reflect"
-
-	"github.com/kjkrol/goke/v3"
+	"unsafe"
 )
 
 // Without leaves the roster's default T out of a kind's Spec — a unit nothing pushes leaves out
@@ -18,7 +17,6 @@ func Omitted(c Comp) (reflect.Type, bool) {
 
 type omit struct{ t reflect.Type }
 
-func (omit) Spawner() Spawner          { return nil }
-func (omit) LoadToken() goke.CompToken { return goke.CompToken{} }
-func (omit) rowType() reflect.Type     { return nil }
-func (o omit) compType() reflect.Type  { return o.t }
+func (o omit) Type() reflect.Type     { return o.t }
+func (omit) Row() reflect.Type        { return nil }
+func (omit) Fill(unsafe.Pointer, any) {}

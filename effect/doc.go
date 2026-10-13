@@ -1,7 +1,7 @@
 // Package effect puts states on entities for a while: each effect with its own marker, tags
 // granted, components altered and restored. An effect is defined once, from a [Spec] of traits,
-// and cast from anywhere — a rule's act.Self.Put, Hold and Take, a command, another pass. The
-// store that makes the effects runs their system every step, so they count down in its time.
+// and cast from anywhere — a rule's act.Self.Put, Hold and Take, a command, another pass. A
+// store's binding runs them every step on its entities, so they count down in its time.
 //
 // # Spec, the marker, Grant and Alter
 //
@@ -15,12 +15,12 @@
 // of one component stacking in slot order; [Described] gives it a sentence for a UI. At most 63
 // effects are defined.
 //
-// # Active, Cast and Dispel
+// # Runtime
 //
-// [Active] is what an entity is under, saved with it; [Wide] is the same with a slot for every
-// effect, for an entity standing for a whole pass or for the whole. [Effects.Cast] and
-// [Effects.CastFor] put an effect on an entity, landing with the effects' next pass;
-// [Effects.Dispel] ends one; [Effects.Has] and the handle's [Effect.On] ask.
+// [Runtime] is the effects as a store's binding runs them: Cast and CastFor put an effect on an
+// entity, landing with the effects' next pass, Dispel ends one, Has asks. A binding reads the
+// register's [Definition]s ([Effects.Definition], [Granted], [Alteration]) and freezes it as it
+// sets up ([Effects.Freeze]).
 //
 // # Changed
 //

@@ -8,9 +8,9 @@ Guidance for Claude Code working in this repository.
 of things that have state and are told what happens to them: entities carry facts and states,
 play roles, obey rules at the moments a pass catches, run plans over time on their minds, and ask
 for things with commands. README.md has the dictionary; `doc/ceremony.md` the language. The
-store of state is goke, an ECS, for now: facts, states, roles and minds are components. A store
-interface — where a fact, a state, a role and the clock come from — is the next step; the plans'
-runner (`internal/steps.Plans`, reached through `act.Planned.Define`) is where it will go.
+store of state is behind the contract `store`; the one binding, `ceremony/goke`, is the only
+package that imports goke (the user's word, 2026-10-13: a language, and a bridge that reads and
+writes the data).
 
 ## Commands
 
@@ -46,30 +46,36 @@ go test ./plan/... -run TestName -v                               # a single tes
 tag              Tags[F], Tag[F], Any, Anything: families of bits
 comp             Comp, Template, Const, Load, Tagged, Marks, Without: a kind's components
 fact             Fact (the mark), From, Subject, Message, Sent, MaxChain, AskLife
-effect           Effects, Effect, Spec (Lasts, Stacking, Then, Grant, Alter, Described), Knob,
-                 Active, Wide, States, Changed, the effects' system
+effect           Effects (the register), Effect, Spec (Lasts, Stacking, Then, Grant, Alter,
+                 Described), Knob, States, Changed, Runtime (what a binding runs), Definition
 command          Command, Issuer, Nobody, Issued, Queue, CommandQueue, Carrier, Routed, Unwrap
-host             Rules, PairRules, StepRules, Tick, TickSource, Columns, Own, Side, SideOf,
-                 Marks, About, Met, Placed, Aimed, Hosted, Host, ErrUnhosted, ErrHostBuilt
+host             Rules, PairRules, StepRules, Tick, TickSource, Side, SideOf, Marks, About,
+                 Met, Placed, Aimed, Hosted, Host, ErrUnhosted, ErrHostBuilt
 cond             Cond, Subject (Self, Other, Around, On), If, Not, Chance, Always, Word,
                  NewWord, Roles, Role
 act              Branch, Subject (Self, Other, Around), Step, Steps, OneOf, Rule, Build,
-                 Lasting, Planned, NewPlan, and the bridges for plan
-plan             Loop, Part, Steps, OneOf, Entity (Self with Wait and Idle), Other, New
+                 Lasting, TopNode and the bridges for plan
+plan             Loop, Part, Steps, OneOf, Entity (Self with Wait and Idle), Other, New,
+                 Planned, Plans, NewPlans (the runner a binding ticks)
+store            Row, Col, Columns, Facts, Mind, StepSet, MaxSteps: the contract of a store
+goke             the binding over goke: Columns (Column, Own, Row), Spawner, LoadComp, Effects, Plans,
+                 Active, Wide
 ceremony (root)  Part, NewPart, Plays, Played, Deliver, Command, Put, Take, Toggle, Trigger,
                  Target, Router, Label, LabelOf, Whom, Named, Group, ID, World
-internal/steps   the engine: trees of steps, Instant (a rule's run), Plans and Mind (a plan's)
+internal/steps   the engine: trees of steps, Instant (a rule's run), Plans (a plan's)
 ```
 
 Imports go one way:
 
 - `plan → act → cond → effect → tag`; `cond → fact`;
-- `host → fact, command, effect, tag`;
-- `act → host, command, comp, internal/steps`;
+- `host → store, fact, command, effect, tag`;
+- `act → host, store, command, internal/steps`; `plan → act, comp, store, internal/steps`;
 - the root `ceremony → act, plan, cond, effect, command, comp, host`;
-- `internal/steps → command, effect, fact, goke`; `comp → tag, goke`; `effect → tag, goke`.
+- `internal/steps → store, command, effect, fact`; `comp → tag`; `effect → tag`;
+- `goke → store, plan, host, effect, comp, tag, goke/v3`.
 
-External: `goke/v3`, `uid`. **Nothing imports gram or anything of a game**: no `render`, no
+External: `uid` everywhere, `goke/v3` in `ceremony/goke` alone: `go list -deps` of every other
+package has no `goke/v3`. **Nothing imports gram or anything of a game**: no `render`, no
 `world`, no plugin. `go list -deps ./... | grep gram` stays empty.
 
 Where a file imports a public package and an internal namesake, the internal one gets an `i`
@@ -118,15 +124,32 @@ built `host.ErrHostBuilt`.
 
 Tests sit in the package whose code they test, external (`_test`) unless they need unexported
 state; `act/helpers_test.go` and `plan/helpers_test.go` make roles out of tags without a store,
-`plan/toys_test.go` a rig of commands and facts on a bare goke ECS. **A new semantics test is
+`plan/toys_test.go` a rig of commands and facts on a bare goke ECS through the binding
+(`ceremony/goke`, imported by external tests of `act`, `plan` and `host` as `cgoke`). **A new semantics test is
 checked with its fix disabled**: before a test of a behaviour is kept, the code that gives the
 behaviour is taken out (a guard — `GuardCame`, a `Timeout` — made to pass) and the test must
 fail; a test that passes either way tests nothing.
 
-## The store's part, for now
+## The store and its binding: zero cost
 
-`plan/store.go` aliases the engine's `Mind`, `Plans`, `NewPlans`, `PlanID` and `MaxSteps` from
-`internal/steps`: a user over goke needs them to run plans (the world registers `Mind` for the
-saves, finds minds, and runs `Plans.System`). They are aliases, the one exception to "no type
-aliases", because a component must be one type for goke and the saves; they move to the store
-binding (`ceremony/goke`) as it is made, with `act.Planned.Define`.
+The engine never knows the store's layout and never pays for not knowing it (the user's word,
+2026-10-13: everything through the store's own systems, queries and command buffers, no
+intermediate layer, no extra pointer to chase on the hot path, no lockpick into a chunk):
+
+- **Reads.** A binding hands the engine a `store.Row` a block at a time: for every column
+  bound, the array of its values as the store's own accessor gives it (`goke.OptColumn.Base`,
+  `Comp.Slice` without the type parameter), nil where the block carries none. The engine
+  indexes it (`Row.At`: nil check, `unsafe.Add(base, i*size)`) as `Slice(cur)[i]` does, and
+  that is all it knows. The cost is a pointer a column a chunk, nothing an entity.
+- **Writes in place** (a tag's bit, a knob under `Alter`, a slot of `Active`) are writes in
+  place, through the same pointer.
+- **Structural writes** (a message, a fact dropped, a family attached) go through the store's
+  staging: `store.Facts.Stage` hands the engine the place reserved in goke's command buffer
+  (`CmdBuf.Reserve`, the first half of `AddOne`) and the engine writes `*(*F)(p) = v` there, so
+  a value is copied once and nothing escapes to the heap. The binding's systems write through
+  their own buffers (`ECS.CmdBuf(runnable)`), which goke syncs with every other.
+- **Services** (`effect.Runtime`, `store.Facts`) are interfaces where the path is dominated by
+  a lookup anyway (`Seek`) or rare.
+
+A change here is measured in gram's `bench/behaviour_test.go` (plans, rules, effects a tick),
+baseline and working tree alternately.

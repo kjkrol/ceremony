@@ -10,7 +10,10 @@ import (
 	"github.com/kjkrol/ceremony/act"
 	"github.com/kjkrol/ceremony/cond"
 	"github.com/kjkrol/ceremony/plan"
+	"github.com/kjkrol/ceremony/store"
 	"github.com/kjkrol/goke/v3"
+
+	cgoke "github.com/kjkrol/ceremony/goke"
 	"github.com/kjkrol/uid"
 )
 
@@ -32,23 +35,23 @@ type rig struct {
 	toys  *toys
 }
 
-type written struct{ plan act.Planned }
+type written struct{ plan plan.Planned }
 
 func write(name string, root plan.Part) written {
 	return written{plan.New(name, root)}
 }
 
-func (w written) mind(c *steps.Plans) steps.Mind {
-	w.plan.Define(c)
-	return steps.Mind{Plan: steps.PlanID(w.plan.Name())}
+func (w written) mind(c *plan.Plans) store.Mind {
+	c.Register(w.plan)
+	return store.Mind{Plan: steps.PlanID(w.plan.Name())}
 }
 
 func newRig(t *testing.T, given written) *rig {
 	t.Helper()
 	r := &rig{t: t, ecs: goke.New(), ids: map[string]goke.CompID{}, toys: newToys()}
-	c := steps.NewPlans(func() time.Duration { return r.now }, 0, nil, &r.toys.carrier)
+	c := plan.NewPlans(func() time.Duration { return r.now }, 0, nil, &r.toys.carrier)
 	follows := given.mind(c)
-	var mind goke.Comp[steps.Mind]
+	var mind goke.Comp[store.Mind]
 	r.ecs.Setup(goke.SystemFn{OnInit: func(si *goke.SysInit) {
 		r.ids["alarm"], r.ids["prod"], r.ids["mood"] = si.RegComp[alarm](), si.RegComp[prod](), si.RegComp[mood]()
 		r.toys.init(si)
@@ -65,7 +68,7 @@ func newRig(t *testing.T, given written) *rig {
 		}
 		r.edits = r.edits[:0]
 	}})
-	run := r.ecs.RegSys(c.System())
+	run := r.ecs.RegSys(cgoke.NewPlans(c))
 	toys := r.ecs.RegSys(r.toys.system())
 	r.ecs.SetPlan(func(ctx goke.RunCtx, d time.Duration) {
 		ctx.Run(edits, d)
@@ -398,7 +401,7 @@ func TestPlan_ABranchNeedsANameAWhenAndAThen(t *testing.T) {
 func TestPlan_OneNameIsOnePlanAWorld(t *testing.T) {
 	walking := write("the same", plan.OneOf(plan.Self.Do(walk{})))
 	jumping := write("the same", plan.OneOf(plan.Self.Do(jump{})))
-	mine, theirs := steps.NewPlans(nil, 0, nil, nil), steps.NewPlans(nil, 0, nil, nil)
+	mine, theirs := plan.NewPlans(nil, 0, nil, nil), plan.NewPlans(nil, 0, nil, nil)
 	if a, b := walking.mind(mine), jumping.mind(theirs); a != b {
 		t.Errorf("two worlds know the plan of one name as %v and %v, want the name hashed alike", a, b)
 	}

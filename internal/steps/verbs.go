@@ -31,9 +31,9 @@ func (a apply) tick(c *ctx, _ int, _ []int) Status {
 		return Failure
 	}
 	if a.d > 0 {
-		c.effects().CastFor(c.cb, c.id, a.e, a.d)
+		c.effects().CastFor(c.id, a.e, a.d)
 	} else {
-		c.effects().Cast(c.cb, c.id, a.e)
+		c.effects().Cast(c.id, a.e)
 	}
 	return Success
 }
@@ -50,7 +50,7 @@ func (h hold) enter(c *ctx, at int) {
 	if c.instant {
 		return
 	}
-	c.sys.effects.CastFor(c.cb, c.id, h.e, effect.Forever)
+	c.sys.effects.CastFor(c.id, h.e, effect.Forever)
 	c.mind.Slot[at] = keepCast
 }
 
@@ -64,7 +64,7 @@ func (h hold) tick(c *ctx, at int, _ []int) Status {
 		return Failure
 	}
 	if c.instant { // renewed every step, lapsing once the rule stops
-		c.effects().CastFor(c.cb, c.id, h.e, 2*c.pass.Dt)
+		c.effects().CastFor(c.id, h.e, 2*c.pass.Dt)
 		return Success
 	}
 	on := c.sys.effects.Has(c.id, h.e)

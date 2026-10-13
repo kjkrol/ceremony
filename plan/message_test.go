@@ -6,9 +6,11 @@ import (
 
 	"github.com/kjkrol/ceremony/cond"
 	"github.com/kjkrol/ceremony/fact"
-	"github.com/kjkrol/ceremony/internal/steps"
 	"github.com/kjkrol/ceremony/plan"
+	"github.com/kjkrol/ceremony/store"
 	"github.com/kjkrol/goke/v3"
+
+	cgoke "github.com/kjkrol/ceremony/goke"
 	"github.com/kjkrol/uid"
 )
 
@@ -122,12 +124,12 @@ type mindless struct{ Size int }
 func newTalk(t *testing.T, plans ...any) *talk {
 	t.Helper()
 	k := &talk{t: t, ecs: goke.New(), toys: newToys()}
-	var minds []steps.Mind
-	c := steps.NewPlans(func() time.Duration { return k.now }, 0, nil, &k.toys.carrier)
-	defined := map[string]steps.Mind{}
+	var minds []store.Mind
+	c := plan.NewPlans(func() time.Duration { return k.now }, 0, nil, &k.toys.carrier)
+	defined := map[string]store.Mind{}
 	for _, p := range plans {
 		if p == nil {
-			minds = append(minds, steps.Mind{})
+			minds = append(minds, store.Mind{})
 			continue
 		}
 		w := p.(written)
@@ -136,7 +138,7 @@ func newTalk(t *testing.T, plans ...any) *talk {
 		}
 		minds = append(minds, defined[w.plan.Name()])
 	}
-	var mind goke.Comp[steps.Mind]
+	var mind goke.Comp[store.Mind]
 	var plain goke.Comp[mindless]
 	k.ecs.Setup(goke.SystemFn{OnInit: func(si *goke.SysInit) {
 		k.needID, k.roomID = si.RegComp[need](), si.RegComp[room]()
@@ -162,7 +164,7 @@ func newTalk(t *testing.T, plans ...any) *talk {
 		}
 		k.edits = k.edits[:0]
 	}})
-	run := k.ecs.RegSys(c.System())
+	run := k.ecs.RegSys(cgoke.NewPlans(c))
 	toys := k.ecs.RegSys(k.toys.system())
 	k.ecs.SetPlan(func(ctx goke.RunCtx, d time.Duration) {
 		ctx.Run(edits, d)

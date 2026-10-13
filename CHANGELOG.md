@@ -1,5 +1,40 @@
 # Changelog
 
+## v0.2.0
+
+The language is free of goke: the one package importing it is the binding `ceremony/goke`, and
+the engine reads and writes the store through the contract `store` at the cost of the typed
+code it replaced (gram's benchmarks of plans, rules and effects, alternately against the tree
+before).
+
+- `store`, new: `Row` and `Col` (a block of entities, an array a column, the engine indexing
+  it and nothing else), `Columns` and `Facts` (what a binding gives the engine to bind the
+  columns it reads and to stage what it writes), `Mind`, `StepSet`, `MaxSteps` (from
+  `internal/steps`; `plan/store.go` and its aliases are gone).
+- `goke`, new: the binding — `Columns` (`NewColumns(qb)`, `Own`, `Row`), `Spawner`, `LoadComp`,
+  `Effects` (`NewEffects(register)`: the register itself and the `effect.Runtime`, its
+  `Module`, `Active` and `Wide`), `Plans` (`NewPlans(plans)`: the system and the `Facts`).
+- `effect` is definitions alone: `Effects` is the register (`Define`, `Named`, `Lookup`,
+  `Guard`, and for a binding `Definition`, `Count`, `Freeze`, `Lasts`), `Effect` has `ID`;
+  `Runtime` is what casts and asks (`Has`, `Cast`, `CastFor`, `Dispel`, without a command
+  buffer); `Granted` and `Alteration` are what a `Grant` and an `Alter` define, the latter a
+  function of an address. `Active`, `Wide`, `Effects.Cast/CastFor/Dispel/Has`, `Module` and
+  `Effect.On` are gone from `effect`.
+- `host`: `Tick` carries no command buffer, its `Effects` is an `effect.Runtime`, `TickSource`
+  takes the step alone; `Rules.Bind` and `PairRules.Bind` take `store.Columns`, `Run` and
+  `RunWhere` a `store.Row` and a count, `PairRules.Read` replaces `InChunk` and `At`;
+  `Columns`, `Of` and `Own` are gone (`goke.Columns.Own` shares a pass's own column).
+- `plan`: `New` makes a `plan.Planned` (from `act`), `Plans` is a real type (`NewPlans`,
+  `Register`, `Roles`, `Bind`, `Facts`, `Tick`); `act.Planned`, `act.NewPlan` are gone,
+  `act.TopNode` is for package plan.
+- `comp`: a `Comp` is `Type`, `Row` and `Fill(dst, row)`; `Spawner`, `LoadToken`, `TypeOf`
+  and `RowOf` are gone.
+- Requires goke v3.4.0 (`RegCompOf`, `LoadCompOf`, `Column`, `OptColumn`, `CmdBuf.Reserve`,
+  `ECS.CmdBuf`, `Comp.Index`).
+
+Saves name the component types by their paths: `effect.Active` and `Wide` are `goke.Active`
+and `Wide`, `steps.Mind` is `store.Mind`, so saves written before do not load.
+
 ## v0.1.0
 
 Carved out of [gram](https://github.com/kjkrol/gram) at commit `fb56d8d`: the language and the
