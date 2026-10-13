@@ -1,0 +1,95 @@
+package ceremony
+
+import (
+	"fmt"
+	"time"
+
+	"github.com/kjkrol/ceremony/command"
+	"github.com/kjkrol/ceremony/effect"
+)
+
+// Command is a command about an effect and whom it is for, written as a sentence:
+// Put(open).On(Group("trapdoors")).By(Named("lever")).For(pulse); a rule gives
+// it with act.Self.Do. A step on whom a branch acts is act.Self.Put or act.Self.Take.
+type Command struct {
+	Verb   Verb
+	Effect effect.Effect
+	Whom   Target
+	Source Whom          // nobody for none
+	Lasts  time.Duration // zero: as the effect's Spec says
+	Name   string        // empty for one not in the Stage's register
+}
+
+// Defined reports whether the command was defined in a Stage's register.
+func (c Command) Defined() bool { return c.Name != "" }
+
+// Verb is what a Command does with its effect.
+type Verb uint8
+
+const (
+	Puts Verb = iota
+	Takes
+	Toggles // takes it off where any target is under it, else puts it on
+)
+
+// Target is whom a Command is for: an Whom, or a plugin's own, which is a Router.
+type Target interface{ Target() }
+
+// Router is a Target of a plugin's own: Route is the command that plugin carries out for c.
+type Router interface {
+	Target
+	Route(c Command) command.Command
+}
+
+// Put puts e on whoever On names.
+func Put(e effect.Effect) Command { return Command{Verb: Puts, Effect: e} }
+
+// Take takes e off whoever On names.
+func Take(e effect.Effect) Command { return Command{Verb: Takes, Effect: e} }
+
+// Toggle takes e off whoever On names where any of them is under it, and puts it on them all
+// otherwise.
+func Toggle(e effect.Effect) Command { return Command{Verb: Toggles, Effect: e} }
+
+// On says whom the command is for.
+func (c Command) On(whom Target) Command { c.Whom = whom; return c }
+
+// By says who sets the command off: an entity bearing the name or the group, as it gives
+// itself Trigger.
+func (c Command) By(source Whom) Command { c.Source = source; return c }
+
+// For says how long a Put lasts, in place of what the effect's Spec says.
+func (c Command) For(d time.Duration) Command { c.Lasts = d; return c }
+
+// Routed is the command as the plugin of its target takes it. It panics for a command that
+// names no target.
+func (c Command) Routed() command.Command {
+	switch t := c.Whom.(type) {
+	case nil:
+		panic(fmt.Sprintf("rule: %v names nobody: say whom with On", c))
+	case Router:
+		return t.Route(c)
+	}
+	return c
+}
+
+// String says what the command does.
+func (c Command) String() string {
+	verb := [...]string{"Put", "Take", "Toggle"}[c.Verb]
+	if c.Whom == nil {
+		return fmt.Sprintf("%s(effect %d)", verb, c.Effect.Mark())
+	}
+	return fmt.Sprintf("%s(effect %d).On(%v)", verb, c.Effect.Mark(), c.Whom)
+}
+
+// Trigger is the command by which an entity sets off every Command whose By names it: a lever
+// pulled gives itself act.Self.Do(Trigger{}).
+type Trigger struct{}
+
+func (Command) Command() {}
+func (Trigger) Command() {}
+
+var (
+	_ command.Command = Command{}
+	_ command.Command = Trigger{}
+)

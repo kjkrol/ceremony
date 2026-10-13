@@ -1,0 +1,155 @@
+package command
+
+import (
+	"fmt"
+	"reflect"
+
+	"github.com/kjkrol/uid"
+)
+
+// Command is what somebody asks for: carried by its type to the one handler whose queue takes
+// it. A type is a command by its method Command, a mark never called, confirmed where it is
+// defined: var _ command.Command = MoveTo{}.
+type Command interface{ Command() }
+
+// Issuer numbers whoever outside the entities gives commands: a user, a client, a script;
+// Nobody is a command nobody in particular gave.
+type Issuer uint8
+
+// Nobody is the Issuer of a command with nobody behind it.
+const Nobody Issuer = 0
+
+// Issued is one command as its handler reads it: who gave it — an Issuer, or with ByEntity an
+// entity for itself — and what it says.
+type Issued[C Command] struct {
+	Issuer   Issuer
+	Entity   uid.UID64
+	ByEntity bool
+	Command  C
+}
+
+// Queue holds the commands of one type until the plugin that owns it drains them in its own pass.
+type Queue[C Command] struct{ items []Issued[C] }
+
+// CommandQueue is a Queue with its command type erased, as a carrier sorts commands into them.
+type CommandQueue interface {
+	Accepts() reflect.Type
+	Put(issuer Issuer, cmd Command)
+	PutFrom(entity uid.UID64, cmd Command)
+	Empty() bool
+}
+
+var _ CommandQueue = (*Queue[Command])(nil)
+
+func (q *Queue[C]) Accepts() reflect.Type                 { return reflect.TypeFor[C]() }
+func (q *Queue[C]) Put(issuer Issuer, cmd Command)        { q.Add(issuer, cmd.(C)) }
+func (q *Queue[C]) PutFrom(entity uid.UID64, cmd Command) { q.AddFrom(entity, cmd.(C)) }
+
+// Add puts cmd in as given by issuer.
+func (q *Queue[C]) Add(issuer Issuer, cmd C) {
+	q.items = append(q.items, Issued[C]{Issuer: issuer, Command: cmd})
+}
+
+// AddFrom puts cmd in as given by entity for itself.
+func (q *Queue[C]) AddFrom(entity uid.UID64, cmd C) {
+	q.items = append(q.items, Issued[C]{Entity: entity, ByEntity: true, Command: cmd})
+}
+
+// Drain hands every command to fn in the order given and empties the queue.
+func (q *Queue[C]) Drain(fn func(i Issued[C])) {
+	for _, it := range q.items {
+		fn(it)
+	}
+	q.items = q.items[:0]
+}
+
+// Empty reports whether nothing is waiting.
+func (q *Queue[C]) Empty() bool { return len(q.items) == 0 }
+
+// Carrier takes each command to the queue of its type. Nothing is dropped: a command waits in
+// its queue for its handler's pass.
+type Carrier struct{ queues map[reflect.Type]CommandQueue }
+
+// Carry adds queues to those c takes commands to; a type another queue takes already is an error.
+func (c *Carrier) Carry(queues ...CommandQueue) error {
+	if c.queues == nil {
+		c.queues = map[reflect.Type]CommandQueue{}
+	}
+	for _, q := range queues {
+		if other, taken := c.queues[q.Accepts()]; taken && other != q {
+			return fmt.Errorf("control: %v has two queues", q.Accepts())
+		}
+		c.queues[q.Accepts()] = q
+	}
+	return nil
+}
+
+// Put takes cmd, given by issuer, to the queue of its type; false when none takes it.
+func (c *Carrier) Put(issuer Issuer, cmd Command) bool {
+	cmd = Unwrap(cmd)
+	q, ok := c.queue(cmd)
+	if ok {
+		q.Put(issuer, cmd)
+	}
+	return ok
+}
+
+// PutFrom takes cmd, given by entity for itself, to the queue of its type; false when none takes
+// it.
+func (c *Carrier) PutFrom(entity uid.UID64, cmd Command) bool {
+	cmd = Unwrap(cmd)
+	q, ok := c.queue(cmd)
+	if ok {
+		q.PutFrom(entity, cmd)
+	}
+	return ok
+}
+
+// Takes reports whether a queue takes commands of type t.
+func (c *Carrier) Takes(t reflect.Type) bool {
+	if c == nil {
+		return false
+	}
+	_, ok := c.queues[t]
+	return ok
+}
+
+// Empty reports whether every command given has been drained.
+func (c *Carrier) Empty() bool {
+	if c == nil {
+		return true
+	}
+	for _, q := range c.queues {
+		if !q.Empty() {
+			return false
+		}
+	}
+	return true
+}
+
+// Routed is a command written one way and carried as another: Routed is the command its handler
+// takes.
+type Routed interface{ Routed() Command }
+
+// Unwrap is cmd as its handler takes it: itself, or what a Routed command says.
+func Unwrap(cmd Command) Command {
+	for {
+		r, ok := cmd.(Routed)
+		if !ok {
+			return cmd
+		}
+		next := r.Routed()
+		if reflect.TypeOf(next) == reflect.TypeOf(cmd) {
+			return next
+		}
+		cmd = next
+	}
+}
+
+func (c *Carrier) queue(cmd Command) (CommandQueue, bool) {
+	if c == nil {
+		return nil, false
+	}
+	q, ok := c.queues[reflect.TypeOf(cmd)]
+	return q, ok
+}

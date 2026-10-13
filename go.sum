@@ -1,0 +1,4 @@
+github.com/kjkrol/goke/v3 v3.3.0 h1:dVqXIpjK+YQQHzPoNIi42a1AsdJo8U2AcYNY36FSKoE=
+github.com/kjkrol/goke/v3 v3.3.0/go.mod h1:58uVZD5rzMFkDp7kOxpwobjcwDV04SYZ58eQzxLeusU=
+github.com/kjkrol/uid v0.3.0 h1:awbHtzOA6tUF/aICp6M/TOMPh6yldNZrzhQd0cvFOjs=
+github.com/kjkrol/uid v0.3.0/go.mod h1:NdpQ5cqvoXGfMDtmgGY4WGmvOK/JrwI74lKWF5SHeWA=
