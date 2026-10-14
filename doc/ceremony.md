@@ -222,7 +222,7 @@ command about an effect is one sentence (`ceremony.Command`):
 holdLate := ceremony.Put(onHold).On(ceremony.Group("late orders")).By(ceremony.Named("audit"))
 closeDesk := ceremony.Toggle(closed).On(ceremony.Named("desk 3"))
 alarm := ceremony.Put(alarmed).On(ceremony.World).For(30 * time.Second)
-hasten := ceremony.Put(haste).On(selection.Selected(hasty))
+hasten := ceremony.Put(haste).On(chosen.Playing(hasty)) // an owner's Router
 ```
 
 - **The verb**: `ceremony.Put` puts the effect on, `ceremony.Take` takes it off,
