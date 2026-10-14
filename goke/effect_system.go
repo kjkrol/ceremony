@@ -175,11 +175,17 @@ func (s *effectSystem) step(w *walk, cursor *goke.Cursor, i int, id uid.UID64, s
 			}
 		}
 	}
-	for comp := range touched {
-		s.recompute(w, cursor, i, id, slots, comp)
-	}
+	// what Then casts begins in the pass its forerunner ran out, its time counted from the next
 	for _, next := range s.thens {
 		s.queue(slots, next, lastsOf(s.reg.Definition(next)))
+		if k := slotOf(slots, next); k >= 0 && slots[k].State == slotPending &&
+			s.begin(w, cursor, i, id, &slots[k], touched) {
+			slots[k].State = slotRunning
+			shown = shown || s.reg.Definition(next).Shows
+		}
+	}
+	for comp := range touched {
+		s.recompute(w, cursor, i, id, slots, comp)
 	}
 	if empty(slots) {
 		s.originals.forget(id)

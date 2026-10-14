@@ -171,6 +171,23 @@ further, on top of its When (below, "Roles").
   nothing. Facts are how a plan learns what came of its commands; a fact comes, and a loop of it
   runs once, or one waiting for it is done.
 
+## How an effect runs
+
+The effects' pass of a step settles every entity's effects at once; a rule or a command of the
+step before lands there. The rules, for whoever writes a rule over a state:
+
+| | |
+|---|---|
+| `Put` on an entity not under the effect | begins at the next effects pass: marker on, `Grant`s and `Alter`s applied, the time from then; `Has` says so from the cast |
+| `Put` on an entity under it | refreshes its time to the Spec's (or the command's `For`), begins nothing again; with `Stacking`, a slot of its own instead, up to 8 on an entity (63 on a plugin's), none free nothing |
+| `Take` | off at the next effects pass: marker off, the knobs put back; `Then` is not cast |
+| the time runs out | off in that pass, and what `Then` names begins **in the same pass**, its time counted from the next step: no step without either |
+| `Hold` in a rule | cast anew every step the branch fires, two steps long, so it lapses two steps after the branch stops; in a plan, held while the loop runs and taken off as it ends, failing the loop when someone else takes it |
+| no `Lasts` | `Forever`: until `Take` |
+| `.For(d)` on a command | d in place of the Spec's length, on `Put` and `Toggle` alike |
+| `Toggle` | off them all where any target is under it, else on them all |
+| a `Put` and a `Take` in one step | a binding may net a step's commands of one effect on one entity (gram does: the last given wins); a cast in the pass of a dispel revives |
+
 ## Idioms
 
 - **Give, then wait for what comes of it.** `plan.Loop[any]{…, Then: plan.Self.Do(Invoice{}),

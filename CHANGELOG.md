@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.2.1
+
+- `goke`: `Active.Left(e)` and `Wide.Left(e)` say what remains of an effect on the entity
+  (`Forever` for one without an end, false while it is not under it), for whoever draws an
+  effect's course.
+- Fixed: what `Then` casts begins in the pass its forerunner runs out, not the next — there
+  was a step with neither effect's marker, a false window for every rule asking "not under".
+- `doc/ceremony.md`: "How an effect runs", the rules of a cast on a running effect, `Take`,
+  running out, `Then`, `Hold`, `Forever`, `For`, `Toggle`, netting.
+
 ## v0.2.0
 
 The language is free of goke: the one package importing it is the binding `ceremony/goke`, and
