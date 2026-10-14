@@ -67,6 +67,21 @@ func TestLower_CountsThePlacesOfOneRing(t *testing.T) {
 	Around(1).If(a).And(Around(2).If(a)).(steps.Lowered).Lower(steps.AtTop, "rings")
 }
 
+func TestLower_CountsThePlacesAheadApartFromThoseAround(t *testing.T) {
+	a := part(1)
+	low := Ahead(3).If(a).(steps.Lowered).Lower(steps.AtTop, "ahead")
+	if low.Placing != steps.AheadPlaces || low.Rings != 3 || low.Places != 1 {
+		t.Errorf("placing %v, steps %d, places %d; want Ahead, 3 and 1", low.Placing, low.Rings,
+			low.Places)
+	}
+	defer func() {
+		if msg, _ := recover().(string); !strings.Contains(msg, "one kind") {
+			t.Errorf("panic %q; want one saying one kind", msg)
+		}
+	}()
+	Around(1).If(a).And(Ahead(1).If(a)).(steps.Lowered).Lower(steps.AtTop, "kinds")
+}
+
 type reply struct{ Yes bool }
 
 func TestIf_AFactComesInAnUntilAlone(t *testing.T) {

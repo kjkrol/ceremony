@@ -101,7 +101,8 @@ const (
 type Lowering struct {
 	Guard     Guard // nil for always
 	SelfRoles []uint8
-	OtherRole int // -1 for none
+	OtherRole int     // -1 for none
+	Placing   Placing // which places the rule turns to, with Places over 0
 	Rings     int
 	Places    int
 	Words     []reflect.Type

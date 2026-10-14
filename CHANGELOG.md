@@ -2,6 +2,10 @@
 
 ## v0.2.1
 
+- `cond.Ahead(n)` and `act.Ahead(n)`: the places on the cells one to n steps ahead of the
+  entity, the way it faces, beside `Around(n)`; a rule of a moment that is `host.Headed` (a
+  `Placed` one facing somewhere), the host telling them through `Tick.Ahead`. One kind of
+  places a rule: `Around` and `Ahead` in one are refused as it is built.
 - `goke`: `Active.Left(e)` and `Wide.Left(e)` say what remains of an effect on the entity
   (`Forever` for one without an end, false while it is not under it), for whoever draws an
   effect's course.

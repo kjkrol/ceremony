@@ -22,6 +22,13 @@ type Placed interface {
 	Placed()
 }
 
+// Headed is a Placed moment of an entity facing somewhere, which Tick.Ahead tells the places
+// in front of and act.Ahead turns a step on.
+type Headed interface {
+	Placed
+	Headed()
+}
+
 // Aimed is a command told the Subject of the moment or the fact it is given on as it is issued.
 type Aimed interface{ Aim(who uid.UID64) }
 
