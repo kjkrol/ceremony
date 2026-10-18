@@ -19,7 +19,7 @@ type Branch[P any] struct {
 	Then Step      // required
 }
 
-// String is the branch's name and its moment: "fall in" of game.Standing.
+// String is the branch's name and the type of its moment.
 func (b Branch[P]) String() string { return fmt.Sprintf("%q of %v", b.Name, reflect.TypeFor[P]()) }
 
 // Hosted is the branch built into the rule its moment's plugin runs, for the hosts

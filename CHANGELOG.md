@@ -11,8 +11,8 @@ Places are the host's library's, ceremony naming none of its own.
   `Around(n)` and `Ahead(n)` did; one kind and one reach of places a rule; a moment its kind
   does not take refuses the rule as it is built.
 - Gone: `cond.Around`, `cond.Ahead`, `act.Around`, `act.Ahead`, `plan.Around`, `plan.Ahead`,
-  `host.Placed`, `host.Headed`, `host.Tick.Around`, `host.Tick.Ahead`. A library having them
-  names its own kinds (gram's board: `board.Around(n)`, `board.Ahead(n)`).
+  `host.Placed`, `host.Headed`, `host.Tick.Around`, `host.Tick.Ahead`: a library having such
+  places names its own kinds.
 
 ## v0.2.1
 
