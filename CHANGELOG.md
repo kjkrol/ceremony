@@ -9,6 +9,10 @@
 - `goke`: `Active.Left(e)` and `Wide.Left(e)` say what remains of an effect on the entity
   (`Forever` for one without an end, false while it is not under it), for whoever draws an
   effect's course.
+- `goke`: `NewPlans(plans, opts...)` and `NewEffects(register, opts...)` take goke options for
+  their queries from the caller (a filter, a pace: goke 3.5's `PacedBy`) and walk them with
+  `Query.Paced`, an effect counting down by the step its block is given. Without options, as
+  before.
 - Fixed: what `Then` casts begins in the pass its forerunner runs out, not the next — there
   was a step with neither effect's marker, a false window for every rule asking "not under".
 - `doc/ceremony.md`: "How an effect runs", the rules of a cast on a running effect, `Take`,

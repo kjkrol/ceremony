@@ -39,6 +39,7 @@ type effectSystem struct {
 	fresh map[uid.UID64]Active
 	// families on their way to entities this pass, likewise joined.
 	attaching map[attachment]uint64
+	opts      []goke.Opt
 }
 
 type walk struct {
@@ -48,8 +49,8 @@ type walk struct {
 	ids     map[reflect.Type]goke.CompID // the families', to attach
 }
 
-func (w *walk) bind(si *goke.SysInit, reg *effect.Effects, slots goke.Trackable) {
-	qb := si.NewQueryBuilder(slots)
+func (w *walk) bind(si *goke.SysInit, reg *effect.Effects, slots goke.Trackable, opts []goke.Opt) {
+	qb := si.NewQueryBuilder(slots).With(opts...)
 	w.columns, w.ids = map[reflect.Type]*goke.OptColumn{}, map[reflect.Type]goke.CompID{}
 	w.states = w.column(si, qb, statesType, true)
 	for k := range reg.Count() {
@@ -91,9 +92,9 @@ type attachment struct {
 	family reflect.Type
 }
 
-func newEffectSystem(reg *effect.Effects) *effectSystem {
+func newEffectSystem(reg *effect.Effects, opts []goke.Opt) *effectSystem {
 	return &effectSystem{reg: reg, originals: newOriginals(), touched: map[reflect.Type]bool{},
-		fresh: map[uid.UID64]Active{}, attaching: map[attachment]uint64{}}
+		fresh: map[uid.UID64]Active{}, attaching: map[attachment]uint64{}, opts: opts}
 }
 
 func (s *effectSystem) Init(si *goke.SysInit) {
@@ -103,8 +104,8 @@ func (s *effectSystem) Init(si *goke.SysInit) {
 			gob.Register(reflect.New(a.Comp).Elem().Interface())
 		}
 	}
-	s.narrow.bind(si, s.reg, &s.active)
-	s.wide.bind(si, s.reg, &s.wideActive)
+	s.narrow.bind(si, s.reg, &s.active, s.opts)
+	s.wide.bind(si, s.reg, &s.wideActive, s.opts)
 	s.lookup = si.NewQueryBuilder(&s.lookupActive).Build()
 	s.lookupWide = si.NewQueryBuilder(&s.lookupSlots).Build()
 	s.activeID = si.RegComp[Active]()
@@ -114,18 +115,18 @@ func (s *effectSystem) Update(cb *goke.CmdBuf, d time.Duration) {
 	s.cb = cb
 	clear(s.fresh)
 	clear(s.attaching)
-	for s.narrow.query.All(); s.narrow.query.Next(); {
-		cursor := s.narrow.query.Cursor()
+	for s.narrow.query.Paced(d); s.narrow.query.Next(); {
+		cursor, dt := s.narrow.query.Cursor(), s.narrow.query.Dt()
 		actives := s.active.Slice(cursor)
 		for i, id := range cursor.IDs {
-			s.advance(&s.narrow, cursor, i, id, actives[i].Slots[:], d)
+			s.advance(&s.narrow, cursor, i, id, actives[i].Slots[:], dt)
 		}
 	}
-	for s.wide.query.All(); s.wide.query.Next(); {
-		cursor := s.wide.query.Cursor()
+	for s.wide.query.Paced(d); s.wide.query.Next(); {
+		cursor, dt := s.wide.query.Cursor(), s.wide.query.Dt()
 		wides := s.wideActive.Slice(cursor)
 		for i, id := range cursor.IDs {
-			s.advance(&s.wide, cursor, i, id, wides[i].Slots[:], d)
+			s.advance(&s.wide, cursor, i, id, wides[i].Slots[:], dt)
 		}
 	}
 }
