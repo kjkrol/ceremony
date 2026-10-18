@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/kjkrol/ceremony/host"
 	"github.com/kjkrol/ceremony/internal/steps"
 	"github.com/kjkrol/ceremony/tag"
 )
@@ -53,33 +54,40 @@ func TestLower_TakesTheRolesAtTheTopAndGuardsTheRest(t *testing.T) {
 	}
 }
 
-func TestLower_CountsThePlacesOfOneRing(t *testing.T) {
+var (
+	round = host.NewPlacing("Round", func(any) bool { return true })
+	front = host.NewPlacing("Front", func(any) bool { return true })
+)
+
+func at(p *host.Placing, n int) Subject { return At(host.Places{Placing: p, N: n}) }
+
+func TestLower_CountsThePlacesOfOneReach(t *testing.T) {
 	a := part(1)
-	low := Around(2).If(a).And(Around(2).If(Not(a))).(steps.Lowered).Lower(steps.AtTop, "places")
-	if low.Rings != 2 || low.Places != 2 {
-		t.Errorf("rings %d, places %d; want 2 and 2", low.Rings, low.Places)
+	low := at(round, 2).If(a).And(at(round, 2).If(Not(a))).(steps.Lowered).
+		Lower(steps.AtTop, "places")
+	if low.At.N != 2 || low.Places != 2 {
+		t.Errorf("reach %d, places %d; want 2 and 2", low.At.N, low.Places)
 	}
 	defer func() {
-		if msg, _ := recover().(string); !strings.Contains(msg, "one ring") {
-			t.Errorf("panic %q; want one saying one ring", msg)
+		if msg, _ := recover().(string); !strings.Contains(msg, "one reach") {
+			t.Errorf("panic %q; want one saying one reach", msg)
 		}
 	}()
-	Around(1).If(a).And(Around(2).If(a)).(steps.Lowered).Lower(steps.AtTop, "rings")
+	at(round, 1).If(a).And(at(round, 2).If(a)).(steps.Lowered).Lower(steps.AtTop, "reaches")
 }
 
-func TestLower_CountsThePlacesAheadApartFromThoseAround(t *testing.T) {
+func TestLower_CountsThePlacesOfOneKind(t *testing.T) {
 	a := part(1)
-	low := Ahead(3).If(a).(steps.Lowered).Lower(steps.AtTop, "ahead")
-	if low.Placing != steps.AheadPlaces || low.Rings != 3 || low.Places != 1 {
-		t.Errorf("placing %v, steps %d, places %d; want Ahead, 3 and 1", low.Placing, low.Rings,
-			low.Places)
+	low := at(front, 3).If(a).(steps.Lowered).Lower(steps.AtTop, "front")
+	if low.At.Placing != front || low.At.N != 3 || low.Places != 1 {
+		t.Errorf("places %v, %d of them; want Front(3) and 1", low.At, low.Places)
 	}
 	defer func() {
 		if msg, _ := recover().(string); !strings.Contains(msg, "one kind") {
 			t.Errorf("panic %q; want one saying one kind", msg)
 		}
 	}()
-	Around(1).If(a).And(Ahead(1).If(a)).(steps.Lowered).Lower(steps.AtTop, "kinds")
+	at(round, 1).If(a).And(at(front, 1).If(a)).(steps.Lowered).Lower(steps.AtTop, "kinds")
 }
 
 type reply struct{ Yes bool }

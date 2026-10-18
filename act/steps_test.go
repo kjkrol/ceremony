@@ -47,19 +47,19 @@ func TestBranch_RefusesWhatItsMomentCannotRun(t *testing.T) {
 		r    act.Rule
 		want string
 	}{
-		"Around on a moment that is not Placed": {act.Branch[nudge]{
+		"places on a moment without them": {act.Branch[nudge]{
 			Name: "lost",
 			When: cond.Self.If(cond.Always),
-			Then: act.Around(1).Do(brace{}),
-		}, "Placed"},
-		"Here on a moment that is not Placed": {act.Branch[nudge]{
+			Then: act.At(around(1)).Do(brace{}),
+		}, "with places Round"},
+		"places nested on a moment without them": {act.Branch[nudge]{
 			Name: "lost",
 			When: cond.Self.If(cond.Always),
 			Then: act.Branch[any]{
 				When: cond.Self.If(cond.Always),
-				Then: act.Around(0).Do(brace{}),
+				Then: act.At(around(0)).Do(brace{}),
 			},
-		}, "Placed"},
+		}, "with places Round"},
 		"a condition on another moment": {act.Branch[nudge]{
 			Name: "lost",
 			When: cond.Self.If(cond.Always),

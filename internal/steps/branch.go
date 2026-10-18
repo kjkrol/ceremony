@@ -7,6 +7,7 @@ import (
 
 	"github.com/kjkrol/ceremony/effect"
 	"github.com/kjkrol/ceremony/fact"
+	"github.com/kjkrol/ceremony/host"
 	"github.com/kjkrol/uid"
 )
 
@@ -37,7 +38,7 @@ var (
 	// OfSubject is the other of the pair the moment met, else the subject of the moment or
 	// the fact; nobody while there is none.
 	OfSubject = Whose{kind: ofSubject}
-	// OfTarget is whom the steps act on now: the place Around turned to.
+	// OfTarget is whom the steps act on now: the place the rule turned to.
 	OfTarget = Whose{kind: ofTarget}
 )
 
@@ -101,9 +102,8 @@ const (
 type Lowering struct {
 	Guard     Guard // nil for always
 	SelfRoles []uint8
-	OtherRole int     // -1 for none
-	Placing   Placing // which places the rule turns to, with Places over 0
-	Rings     int
+	OtherRole int         // -1 for none
+	At        host.Places // the places the rule turns to, with Places over 0
 	Places    int
 	Words     []reflect.Type
 	Came      int

@@ -85,7 +85,7 @@ func (f *fired[P]) fire(t host.Tick, about P) {
 		subject, aimed = any(&f.current).(fact.Subject).Subject()
 	}
 	p := steps.Pass{Commands: t.Commands, Effects: t.Effects, Dt: t.Dt, Time: t.Time,
-		Seed: t.Seed, Around: t.Around, Ahead: t.Ahead, Roles: t.Roles}
+		Seed: t.Seed, Places: t.Places, Roles: t.Roles}
 	f.run.Fire(p, id, f.about, subject, aimed)
 }
 

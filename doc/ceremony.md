@@ -69,7 +69,7 @@ P       = Moment (a branch) | Fact (a loop) | any
 When    = cond.Cond                            // a loop's Until the same: done once it holds
 Cond    = clause | Cond.And(Cond) | Cond.Or(Cond) | cond.Not(Cond)
 clause  = subject.If(what)
-subject = cond.Self | cond.Other | cond.Around(n) | cond.Ahead(n) | cond.On(owner)
+subject = cond.Self | cond.Other | cond.At(places) | cond.On(owner)
 what    = effect | role | word | fact{} | cond.Chance(p) | cond.Always | cond.Not(what)
           // fact{}: in Until alone, of Self alone
 word    = cond.NewWord(name, func(P) bool) | ... .OfOther()
@@ -77,7 +77,7 @@ Then    = step | act.Steps(Then...) | act.OneOf(Then...) | branch    // a branch
 part    = Then | plan.Self.Wait(d) | plan.Self.Idle()                // a loop's
         | plan.Steps(part...) | plan.OneOf(part...) | loop
 step    = actor.Put(e) | actor.Take(e) | actor.Hold(e) | actor.Do(cmd)
-actor   = act.Self | act.Other | act.Around(n) | act.Ahead(n)   // in a plan: plan.Self, plan.Other
+actor   = act.Self | act.Other | act.At(places)   // in a plan: plan.Self, plan.Other
 ```
 
 - A Branch given to a role (`ceremony.Part.Obeys`) is a rule of `P` for the host that catches
@@ -86,8 +86,8 @@ actor   = act.Self | act.Other | act.Around(n) | act.Ahead(n)   // in a plan: pl
   Branch says its `When` (`cond.Self.If(cond.Always)` for every time) and its `Then`; one missing
   panics by the branch's name. So does what the rule cannot run, as it is built: a `Not` of a
   state outside a clause, a word of the wrong side or of another moment, a fact in a `When`,
-  `Around` where `P` is not `host.Placed`, `Ahead` where it is not `host.Headed`, `Around` and
-  `Ahead` in one rule, a Branch of another moment inside, a message, a Branch
+  `At` places of a kind `P` does not have, two kinds or two reaches of places in one rule, a
+  Branch of another moment inside, a message, a Branch
   at the top of a rule without a `Name`. A plan's parts — `Wait`, `Idle`, a Loop — do not
   compile in a rule's `Then`.
 - `plan.New(name, root)` is a plan, a `plan.Planned`: the component its entities carry, their
@@ -122,11 +122,10 @@ turning it round. A clause is a subject in a state, `subject.If(what)`:
 
 - **whom**: `cond.Self`, the entity the branch is about; `cond.Other`, the other of the pair the
   moment met, or the subject of the moment or the fact — the nearest seen, the one touched, who sent
-  a message — which does not hold while there is none; `cond.Around(n)`, each place within `n` rings
-  of where the entity stands, in a rule of a `host.Placed` moment, and `cond.Ahead(n)`, each place
-  on the cells one to `n` steps ahead of it, the way it faces, in a rule of a `host.Headed` moment
-  (below, "Where one stands"); `cond.On(owner)`, an owner's own entity — anything with an
-  `Entity()`: `cond.On(world).If(alarm)` a state of the whole;
+  a message — which does not hold while there is none; `cond.At(places)`, each of the places the
+  moment's host tells, in a rule of a moment that has them (below, "Where one stands");
+  `cond.On(owner)`, an owner's own entity — anything with an `Entity()`:
+  `cond.On(world).If(alarm)` a state of the whole;
 - **what**: an effect, the one under it; a role, the one playing it; a word of the moment or
   the fact — `cond.NewWord(name, func(P) bool)`, `.OfOther()` for one of the other;
   `cond.Chance(p)`, drawn for whom it is asked, afresh every step from the seed, the time and
@@ -206,14 +205,12 @@ step before lands there. The rules, for whoever writes a rule over a state:
   after the last.
 - **A rule's memory is an effect.** `When: cond.Self.If(cond.Not(e))` with `act.Self.Put(e)`
   among the steps runs a thing and not again for as long as `e` lasts.
-- **Where one stands.** On a moment that is `host.Placed` — the host tells the places round
-  through `Tick.Around` — `cond.Around(n).If(x)` and `act.Around(n).Put(e)` turn to each place
-  within `n` rings of where the entity stands, each once; `0` the places it stands on alone. On
-  one that is `host.Headed` — the host tells the places in front through `Tick.Ahead` —
-  `cond.Ahead(n).If(x)` and `act.Ahead(n).Do(cmd)` turn to each place on the cells one to `n`
-  steps ahead, the way the entity faces, the nearest first: a lever in front of a unit, a wall
-  three cells on. The smallest part of the rule holding every clause of a place runs once a
-  place; one kind of places and one ring a rule.
+- **Where one stands.** A library names the kinds of places its hosts tell
+  (`host.NewPlacing(name, takes)`: those round where an entity stands, those in front of it),
+  each taking the moments that have them, and gives `host.Places{Placing, N}`, some of a kind
+  within `N`. `cond.At(places).If(x)` and `act.At(places).Put(e)` turn to each place the host
+  tells through `Tick.Places`, each once. The smallest part of the rule holding every clause of
+  a place runs once a place; one kind of places and one reach a rule.
 - **Now and then.** `cond.Self.If(cond.Chance(p))` holds with likelihood `p`; a coin is
   `act.OneOf(act.Branch[any]{When: cond.Self.If(cond.Chance(0.5)), Then: a}, b)`.
 - **One after another.** `effect.Then(next)` casts `next` when an effect's time is up — burning
@@ -404,8 +401,8 @@ once a pair (`PairRules.DispatchEitherWay`), and in a moment grouped by observer
 rule fires. An entity playing two roles that obey the same rule obeys it once for each.
 
 A role in a clause holds while the one the clause is about plays it; under
-`cond.Around(n).If(role)` that is the place turned to: `When: cond.Self.If(pull).And(
-cond.Around(1).If(lever)), Then: act.Around(1).Do(ceremony.Trigger{})` pulls the lever beside
+`cond.At(places).If(role)` that is the place turned to: `When: cond.Self.If(pull).And(
+cond.At(beside).If(lever)), Then: act.At(beside).Do(ceremony.Trigger{})` pulls the lever beside
 and nothing else there.
 
 **Roles mean behaviour, names and groups mean which ones.** One rule of the role plate serves

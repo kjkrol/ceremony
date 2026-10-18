@@ -1,5 +1,19 @@
 # Changelog
 
+## v0.3.0
+
+Places are the host's library's, ceremony naming none of its own.
+
+- `host.NewPlacing(name, takes)` is a kind of places a library's hosts tell for their moments
+  (those round where an entity stands, those in front of it), `takes` saying which moments have
+  them; `host.Places{Placing, N}` are some of a kind within `N`; `host.Tick.Places` tells them.
+- `cond.At(places)` and `act.At(places)` turn a rule to each place, once a place, as
+  `Around(n)` and `Ahead(n)` did; one kind and one reach of places a rule; a moment its kind
+  does not take refuses the rule as it is built.
+- Gone: `cond.Around`, `cond.Ahead`, `act.Around`, `act.Ahead`, `plan.Around`, `plan.Ahead`,
+  `host.Placed`, `host.Headed`, `host.Tick.Around`, `host.Tick.Ahead`: a library having such
+  places names its own kinds.
+
 ## v0.2.1
 
 - `cond.Ahead(n)` and `act.Ahead(n)`: the places on the cells one to n steps ahead of the

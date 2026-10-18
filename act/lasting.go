@@ -60,11 +60,11 @@ func (l loop[P]) node(outer string, b *build) steps.Step {
 	}
 	low := l.when.(steps.Lowered).Lower(steps.Inside, name)
 	if p := l.then.places(); low.Places > 0 || p.count > 0 {
-		placing := low.Placing
+		at := low.At
 		if p.count > 0 {
-			placing = p.placing
+			at = p.at
 		}
-		panic(fmt.Sprintf("act: %q: %s is a rule's: a plan has no places", name, placing))
+		panic(fmt.Sprintf("act: %q: %s is a rule's: a plan has no places", name, at))
 	}
 	var until steps.Guard
 	if l.until != nil {

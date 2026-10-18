@@ -19,7 +19,7 @@ type Branch[P any] struct {
 	Then Step      // required
 }
 
-// String is the branch's name and its moment: "fall in" of unit.Standing.
+// String is the branch's name and the type of its moment.
 func (b Branch[P]) String() string { return fmt.Sprintf("%q of %v", b.Name, reflect.TypeFor[P]()) }
 
 // Hosted is the branch built into the rule its moment's plugin runs, for the hosts
@@ -47,14 +47,14 @@ func (b Branch[P]) places() placed {
 		return placed{}
 	}
 	low := b.When.(steps.Lowered).Lower(steps.Inside, b.Name)
-	return placed{placing: low.Placing, rings: low.Rings, count: low.Places}.with(b.Then.places())
+	return placed{at: low.At, count: low.Places}.with(b.Then.places())
 }
 
 // topNode is the branch at the top of a plan, where it must say its name.
 func (b Branch[P]) topNode() steps.Step {
 	b.check("plan")
 	if p := b.places(); p.count > 0 {
-		panic(fmt.Sprintf("act: %q: %s is a rule's: a plan has no places", b.Name, p.placing))
+		panic(fmt.Sprintf("act: %q: %s is a rule's: a plan has no places", b.Name, p.at))
 	}
 	return b.node(b.Name, &build{})
 }
@@ -90,11 +90,11 @@ func (b Branch[P]) build() Rule {
 	p := b.places()
 	switch {
 	case p.kinds:
-		panic(fmt.Sprintf("act: %q: Around and Ahead: one kind of places a rule", b.Name))
+		panic(fmt.Sprintf("act: %q: one kind of places a rule", b.Name))
 	case p.mixed:
-		panic(fmt.Sprintf("act: %q: one ring of places a rule", b.Name))
+		panic(fmt.Sprintf("act: %q: one reach of places a rule", b.Name))
 	}
-	bd := &build{placing: p.placing, rings: p.rings, total: p.count, moment: reflect.TypeFor[P]()}
+	bd := &build{at: p.at, total: p.count, moment: reflect.TypeFor[P]()}
 	low := b.lower(b.Name, steps.AtTop, bd.moment)
 	root := bd.place(b, steps.NewBranch[P](b.Name, low.Guard, b.Then.node(b.Name, bd), nil),
 		b.Then)

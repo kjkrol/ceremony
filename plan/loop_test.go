@@ -6,8 +6,13 @@ import (
 
 	"github.com/kjkrol/ceremony/act"
 	"github.com/kjkrol/ceremony/cond"
+	"github.com/kjkrol/ceremony/host"
 	"github.com/kjkrol/ceremony/plan"
 )
+
+var nearby = host.NewPlacing("Near", func(any) bool { return true })
+
+func near(n int) host.Places { return host.Places{Placing: nearby, N: n} }
 
 func TestLoop_UntilEndsAsTheFactComesAfresh(t *testing.T) {
 	r := newRig(t, write("walk till done, then jump", plan.Steps(
@@ -83,19 +88,19 @@ func TestLoop_RefusesWhatAPlanCannotSay(t *testing.T) {
 		}, "Self alone"},
 		"a place": {plan.Loop[any]{
 			Name: "place",
-			When: cond.Around(1).If(a),
+			When: cond.At(near(1)).If(a),
 			Then: plan.Self.Do(walk{}),
 		}, "a rule's"},
 		"a place in a branch": {act.Branch[any]{
 			Name: "place",
 			When: cond.Self.If(cond.Always),
-			Then: act.Around(1).Do(walk{}),
+			Then: act.At(near(1)).Do(walk{}),
 		}, "a rule's"},
-		"a place ahead": {plan.Loop[any]{
-			Name: "ahead",
+		"a place of the plan's": {plan.Loop[any]{
+			Name: "near",
 			When: cond.Self.If(cond.Always),
-			Then: plan.Ahead(1).Do(walk{}),
-		}, "Ahead is a rule's"},
+			Then: plan.At(near(1)).Do(walk{}),
+		}, "Near(1) is a rule's"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			defer func() {

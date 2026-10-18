@@ -50,10 +50,10 @@ effect           Effects (the register), Effect, Spec (Lasts, Stacking, Then, Gr
                  Described), Knob, States, Changed, Runtime (what a binding runs), Definition
 command          Command, Issuer, Nobody, Issued, Queue, CommandQueue, Carrier, Routed, Unwrap
 host             Rules, PairRules, StepRules, Tick, TickSource, Side, SideOf, Marks, About,
-                 Met, Placed, Headed, Aimed, Hosted, Host, ErrUnhosted, ErrHostBuilt
-cond             Cond, Subject (Self, Other, Around, Ahead, On), If, Not, Chance, Always, Word,
+                 Met, Placing (NewPlacing), Places, Aimed, Hosted, Host, ErrUnhosted, ErrHostBuilt
+cond             Cond, Subject (Self, Other, At, On), If, Not, Chance, Always, Word,
                  NewWord, Roles, Role
-act              Branch, Subject (Self, Other, Around, Ahead), Step, Steps, OneOf, Rule, Build,
+act              Branch, Subject (Self, Other, At), Step, Steps, OneOf, Rule, Build,
                  Lasting, TopNode and the bridges for plan
 plan             Loop, Part, Steps, OneOf, Entity (Self with Wait and Idle), Other, New,
                  Planned, Plans, NewPlans (the runner a binding ticks)
@@ -108,12 +108,13 @@ name, so a mistake is found as the rules are defined and never as a silent no-op
   `Fact()` in `If` is "no such state"; a fact's value is allowed in an `Until` alone, of `Self`
   alone, never under `Not`;
 - a word says its side (`cond.Word.OfOther`): a word of the other in `Self`, of the entity in
-  `Other`, or in `Around` or `Ahead`, is refused; in a rule a word must be of the rule's moment;
+  `Other`, or in `At`, is refused; in a rule a word must be of the rule's moment;
 - a loop's `Until` is lowered `AsUntil`; a loop and a branch need a `When` and a `Then`, one at
   the top of a rule or a plan a `Name`;
-- places are a rule's: `Around` or `Ahead` in a plan is refused, so are two kinds of places or
-  two rings in one rule; a moment that is not `host.Placed` refuses `Around`, one that is not
-  `host.Headed` refuses `Ahead`, as the rule is built (`steps.NewInstant`);
+- places are a rule's: `At` in a plan is refused, so are two kinds of places or two reaches in
+  one rule; a moment its `host.Placing` does not take refuses `At` as the rule is built
+  (`steps.NewInstant`); the kinds of places (round where one stands, in front) are the host's
+  library's, never ceremony's;
 - the other's role needs a moment with others (`host.Met`), and is said once; `cond.On` takes
   something with an `Entity()`; `cond.Not` of a state outside a clause says of nobody;
 - a command naming nobody panics in `Command.Routed`; a plan needs a name and is defined once.

@@ -5,6 +5,7 @@ import (
 
 	"github.com/kjkrol/ceremony/command"
 	"github.com/kjkrol/ceremony/effect"
+	"github.com/kjkrol/ceremony/host"
 	"github.com/kjkrol/ceremony/internal/steps"
 )
 
@@ -13,15 +14,13 @@ type whoKind uint8
 const (
 	ofSelf whoKind = iota
 	ofOther
-	ofAround
-	ofAhead
+	ofPlaces
 )
 
-// Subject is whom a step is done by or to: Self, Other, Around(n) or Ahead(n). Its methods are
-// the steps.
+// Subject is whom a step is done by or to: Self, Other or At(places). Its methods are the steps.
 type Subject struct {
-	kind  whoKind
-	rings int
+	kind whoKind
+	at   host.Places
 }
 
 var (
@@ -32,13 +31,9 @@ var (
 	Other = Subject{kind: ofOther}
 )
 
-// Around is each place within rings of where the entity stands, in a rule of a moment that is
-// host.Placed.
-func Around(rings int) Subject { return Subject{kind: ofAround, rings: rings} }
-
-// Ahead is each place on the cells one to steps ahead of the entity, the way it faces, in a rule
-// of a moment that is host.Headed.
-func Ahead(steps int) Subject { return Subject{kind: ofAhead, rings: steps} }
+// At is each of the places its moment's host tells (host.Tick.Places), in a rule of a moment
+// with them.
+func At(places host.Places) Subject { return Subject{kind: ofPlaces, at: places} }
 
 // String says whom.
 func (s Subject) String() string {
@@ -47,10 +42,8 @@ func (s Subject) String() string {
 		return "Self"
 	case ofOther:
 		return "Other"
-	case ofAhead:
-		return fmt.Sprintf("Ahead(%d)", s.rings)
 	}
-	return fmt.Sprintf("Around(%d)", s.rings)
+	return s.at.String()
 }
 
 // Do gives the subject the command cmd and does well at once; a host.Aimed command is told
@@ -108,11 +101,8 @@ func (c clause) node(name string, b *build) steps.Step {
 }
 
 func (c clause) places() placed {
-	switch c.who.kind {
-	case ofAround:
-		return placed{placing: steps.AroundPlaces, rings: c.who.rings, count: 1}
-	case ofAhead:
-		return placed{placing: steps.AheadPlaces, rings: c.who.rings, count: 1}
+	if c.who.kind == ofPlaces {
+		return placed{at: c.who.at, count: 1}
 	}
 	return placed{}
 }

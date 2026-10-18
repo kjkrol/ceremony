@@ -6,9 +6,14 @@
 // # Moments
 //
 // A moment is what a pass perceives of an entity, handed to rules and forgotten: a value that
-// is [About] (Who, the entity it is of), [Met] for one entity with others, [Placed] for one
-// standing on places that are entities of their own, [Headed] for one of those facing somewhere.
-// [Aimed] is a command told the subject of the moment it is given on.
+// is [About] (Who, the entity it is of), [Met] for one entity with others. [Aimed] is a command
+// told the subject of the moment it is given on.
+//
+// # Places
+//
+// A library names the kinds of places its hosts tell for their moments ([NewPlacing]: those
+// round where an entity stands, those in front of it), each saying which moments have them;
+// [Places] are some of a kind, whom a rule's cond.At and act.At turn to, told by [Tick.Places].
 //
 // # Hosts
 //
@@ -16,6 +21,5 @@
 // the tag families the rules name ([Side], [Marks]); [StepRules] runs rules of a moment of the
 // whole once a step. Each is a [Host]: Add takes a rule or refuses it with [ErrUnhosted], and
 // after Bind with [ErrHostBuilt]. [Tick] is what a host tells its rules of the pass: the
-// commands' carrier, the effects' runtime, the time, the seed, the places round and the roles
-// played.
+// commands' carrier, the effects' runtime, the time, the seed, the places and the roles played.
 package host

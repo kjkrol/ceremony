@@ -22,12 +22,13 @@ that imports it.
 | entity | a thing with identity carrying state | a `uid.UID64` and its components |
 | fact | what happened to an entity, carried until it goes | `fact.Fact` marks the type |
 | message | a fact with a sender | `fact.From` embedded in a command |
-| moment | what a pass perceives of an entity, handed to rules | `host.About`, `Met`, `Placed`, `Headed` |
+| moment | what a pass perceives of an entity, handed to rules | `host.About`, `Met` |
+| places | entities a host tells of a moment, of a kind its library names | `host.NewPlacing`, `Places` |
 | state | an effect: on for a while, with a marker, turning knobs | `effect.Spec`, `Effect.Mark()` |
 | knob | a component an effect turns and its owner only reads | `effect.Knob`, `effect.Alter[T]` |
 | role | a behaviour an entity plays: the rules it obeys | `ceremony.Part`, a bit of `cond.Roles` |
 | word | a predicate of a moment or a fact, with its side | `cond.NewWord`, `.OfOther()` |
-| condition | who is in what state | `cond.Self.If(x)`, `Other`, `Around(n)`, `Ahead(n)`, `On(o)` |
+| condition | who is in what state | `cond.Self.If(x)`, `Other`, `At(places)`, `On(o)` |
 | step | what is done, said of whom | `act.Self.Do(cmd)`, `Put(e)`, `Take(e)`, `Hold(e)` |
 | command | a request carried by type to its handler | `command.Command`, `Queue`, `Carrier` |
 | rule | a reaction within a pass | `act.Branch[Moment]{Name, When, Then}` |
@@ -122,10 +123,10 @@ of its type is the answer. The language is in [doc/ceremony.md](doc/ceremony.md)
 
 ## Plugging in
 
-- **Perceive**: write a moment type (`Who()` the entity; `Whom` for a pair, `Placed()` for one
-  standing on places), keep a `host.Rules[M]` (`PairRules` for pairs, `StepRules` for a moment
-  of the whole), `Bind` it to the columns of the pass's query (`goke.NewColumns(qb)`) and `Run`
-  it over every chunk (`cols.Row(cursor)`) with a `host.Tick`.
+- **Perceive**: write a moment type (`Who()` the entity; `Whom` for a pair; the places it has,
+  told by `Tick.Places`, of a kind `host.NewPlacing` names), keep a `host.Rules[M]` (`PairRules`
+  for pairs, `StepRules` for a moment of the whole), `Bind` it to the columns of the pass's query
+  (`goke.NewColumns(qb)`) and `Run` it over every chunk (`cols.Row(cursor)`) with a `host.Tick`.
 - **Tell facts**: put a component marked `fact.Fact` on the entity when the thing happens and
   take it off when it is over; plans begin on it and wait for it.
 - **Define states and roles**: `effect.New(name)` then `Define(name, effect.Spec{...})`, run
@@ -140,9 +141,10 @@ of its type is the answer. The language is in [doc/ceremony.md](doc/ceremony.md)
 
 A type is a fact by its method `Fact()`, a knob by `Knob()`, a command by `Command()` — marks
 never called, confirmed beside the type (`var _ fact.Fact = Arrived{}`). A moment is one by its
-`Who()`, a pair by `Whom`, a place by `Placed()`, one facing somewhere by `Headed()`. What the
-grammar cannot run is refused as the branch is built, by the branch's name: a word of the wrong
-side, a fact in a `When`, `Around` or `Ahead` in a plan, a loop on a type that is no fact.
+`Who()`, a pair by `Whom`; one has places of a kind its `host.Placing` takes. What the grammar
+cannot run is refused as the branch is built, by the branch's name: a word of the wrong side, a
+fact in a `When`, `At` in a plan or on a moment without those places, a loop on a type that is
+no fact.
 
 ## Install
 
