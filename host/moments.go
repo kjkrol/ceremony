@@ -15,20 +15,6 @@ type Met interface {
 	Whom(each func(uid.UID64))
 }
 
-// Placed is a moment of an entity standing on places that are entities of their own, which
-// Tick.Around tells and act.Around turns a step on.
-type Placed interface {
-	About
-	Placed()
-}
-
-// Headed is a Placed moment of an entity facing somewhere, which Tick.Ahead tells the places
-// in front of and act.Ahead turns a step on.
-type Headed interface {
-	Placed
-	Headed()
-}
-
 // Aimed is a command told the Subject of the moment or the fact it is given on as it is issued.
 type Aimed interface{ Aim(who uid.UID64) }
 

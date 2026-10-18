@@ -17,12 +17,9 @@ type Tick struct {
 	Time     time.Duration // game time at the step's end
 	Seed     uint64
 	World    uid.UID64 // the world's own entity
-	// Around tells each the places within rings of where the moment stands, those it stands on
-	// first; nil where there are none.
-	Around func(moment any, rings int, each func(uid.UID64))
-	// Ahead tells each the places on the cells one to steps ahead of the moment, the way its
-	// entity faces, the nearest first; nil where there are none.
-	Ahead func(moment any, steps int, each func(uid.UID64))
+	// Places tells each the places p are of the moment, a pointer to it; nil where there are
+	// none.
+	Places func(moment any, p Places, each func(uid.UID64))
 	// Roles tells the roles an entity plays, a bit each; nil where there are none.
 	Roles func(id uid.UID64) uint64
 }

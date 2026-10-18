@@ -8,6 +8,7 @@ import (
 	"github.com/kjkrol/ceremony/command"
 	"github.com/kjkrol/ceremony/effect"
 	"github.com/kjkrol/ceremony/fact"
+	"github.com/kjkrol/ceremony/host"
 	"github.com/kjkrol/ceremony/store"
 	"github.com/kjkrol/uid"
 )
@@ -19,8 +20,7 @@ type Pass struct {
 	Dt       time.Duration
 	Time     time.Duration // game time at the step's end
 	Seed     uint64
-	Around   func(moment any, rings int, each func(uid.UID64))
-	Ahead    func(moment any, steps int, each func(uid.UID64))
+	Places   func(moment any, p host.Places, each func(uid.UID64))
 	Roles    func(id uid.UID64) uint64 // a bit a role
 }
 
@@ -46,28 +46,6 @@ type instantExec interface{ instant() }
 
 // refuses says why not on the moment payload points to, empty where it runs
 type momentExec interface{ refuses(payload any) string }
-
-type placed interface{ Placed() }
-
-type headed interface{ Headed() }
-
-// Placing is which places a rule turns to: those round the entity, or those ahead of it.
-type Placing uint8
-
-const (
-	// AroundPlaces are the places within n rings of where the entity stands.
-	AroundPlaces Placing = iota + 1
-	// AheadPlaces are the places on the cells one to n steps ahead of the entity.
-	AheadPlaces
-)
-
-// String says Around or Ahead.
-func (p Placing) String() string {
-	if p == AheadPlaces {
-		return "Ahead"
-	}
-	return "Around"
-}
 
 // Instant is a rule laid out for running at a moment, every step of it done within the pass.
 type Instant struct {
@@ -127,47 +105,36 @@ func (same) tick(c *ctx, _ int, kids []int) Status {
 	return st
 }
 
-// NewPlaces runs step on each place within n rings of where the entity stands, or on the cells
-// n steps ahead of it, in place of it.
-func NewPlaces(placing Placing, n int, step Step) Step {
-	sign := fmt.Sprintf("%s(%d)", strings.ToLower(placing.String()), n)
-	return composite{kids: []Step{step}, sign: sign,
-		make: func() exec { return around{placing: placing, n: n} }}
+// NewPlaces runs step on each of the places at the host tells for the moment, in place of the
+// entity.
+func NewPlaces(at host.Places, step Step) Step {
+	return composite{kids: []Step{step}, sign: strings.ToLower(at.String()),
+		make: func() exec { return around{at: at} }}
 }
 
 type met interface{ Whom(each func(uid.UID64)) }
 
 type around struct {
 	basic
-	placing Placing
-	n       int
+	at host.Places
 }
 
 func (around) instant() {}
 
 func (a around) refuses(payload any) string {
-	if a.placing == AheadPlaces {
-		if _, ok := payload.(headed); ok {
-			return ""
-		}
-		return "needs a moment that is Headed"
-	}
-	if _, ok := payload.(placed); ok {
+	if a.at.Placing.Takes(payload) {
 		return ""
 	}
-	return "needs a moment that is Placed"
+	return fmt.Sprintf("needs a moment with places %s", a.at.Placing)
 }
 
 func (a around) tick(c *ctx, _ int, kids []int) Status {
-	tell := c.pass.Around
-	if a.placing == AheadPlaces {
-		tell = c.pass.Ahead
-	}
+	tell := c.pass.Places
 	if !c.entity || tell == nil {
 		return Failure
 	}
 	self, st := c.id, Failure
-	tell(c.payload, a.n, func(place uid.UID64) {
+	tell(c.payload, a.at, func(place uid.UID64) {
 		c.id = place
 		if c.run(kids[0]) == Success {
 			st = Success

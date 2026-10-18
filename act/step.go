@@ -3,10 +3,11 @@ package act
 import (
 	"reflect"
 
+	"github.com/kjkrol/ceremony/host"
 	"github.com/kjkrol/ceremony/internal/steps"
 )
 
-// Step is a part of a rule's Then: a step said of somebody (Self.Do, Other.Put, Around(n).Put),
+// Step is a part of a rule's Then: a step said of somebody (Self.Do, Other.Put, At(p).Put),
 // a group of them (Steps, OneOf) or a Branch. Every Step is a Lasting too: a plan takes it.
 type Step interface {
 	node(name string, b *build) steps.Step
@@ -25,9 +26,9 @@ type Lasting interface {
 // a build is one rule's or plan's: whose places the rule turns to, how many clauses say so,
 // and the moment of a rule (nil in a plan), which its words must be of
 type build struct {
-	placing      steps.Placing
-	rings, total int
-	moment       reflect.Type
+	at     host.Places
+	total  int
+	moment reflect.Type
 }
 
 // place wraps n, the node of s, to run once a place where s holds every clause of a place and
@@ -41,14 +42,14 @@ func (b *build) place(s Lasting, n steps.Step, parts ...Lasting) steps.Step {
 			return n
 		}
 	}
-	return steps.NewPlaces(b.placing, b.rings, n)
+	return steps.NewPlaces(b.at, n)
 }
 
-// placed is what a step turns to: which places, how far, how many clauses say so; mixed where
-// two say different rings, kinds where two say different kinds
+// placed is what a step turns to: which places, how many clauses say so; mixed where two say
+// different reaches, kinds where two say different kinds
 type placed struct {
-	placing      steps.Placing
-	rings, count int
+	at           host.Places
+	count        int
 	mixed, kinds bool
 }
 
@@ -59,9 +60,9 @@ func (p placed) with(o placed) placed {
 	if o.count == 0 {
 		return p
 	}
-	return placed{placing: p.placing, rings: p.rings, count: p.count + o.count,
-		mixed: p.mixed || o.mixed || p.rings != o.rings,
-		kinds: p.kinds || o.kinds || p.placing != o.placing}
+	return placed{at: p.at, count: p.count + o.count,
+		mixed: p.mixed || o.mixed || p.at.N != o.at.N,
+		kinds: p.kinds || o.kinds || p.at.Placing != o.at.Placing}
 }
 
 type leaf struct {

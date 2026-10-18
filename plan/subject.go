@@ -17,11 +17,8 @@ var (
 	Other = act.Other
 )
 
-// Around is a rule's; a plan has no places.
-var Around = act.Around
-
-// Ahead is a rule's; a plan has no places.
-var Ahead = act.Ahead
+// At is a rule's; a plan has no places.
+var At = act.At
 
 // Wait is the entity doing nothing for d, then done well.
 func (Entity) Wait(d time.Duration) Part { return part{act.NewWait(d)} }

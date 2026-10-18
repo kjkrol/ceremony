@@ -218,15 +218,15 @@ func TestRule_ChanceIsTheSameForTheSameSeedAndTime(t *testing.T) {
 	}
 }
 
-func TestRule_HereNeedsAPlacedMoment(t *testing.T) {
+func TestRule_PlacesNeedAMomentWithThem(t *testing.T) {
 	defer func() {
-		if msg, _ := recover().(string); !strings.Contains(msg, "Placed") {
-			t.Errorf("panic %q, want one saying the moment must be Placed", msg)
+		if msg, _ := recover().(string); !strings.Contains(msg, "with places Round") {
+			t.Errorf("panic %q, want one saying the moment must have the places", msg)
 		}
 	}()
 	act.Build(act.Branch[nudge]{
 		Name: "here",
 		When: cond.Self.If(cond.Always),
-		Then: act.Around(0).Do(dodge{}),
+		Then: act.At(around(0)).Do(dodge{}),
 	})
 }

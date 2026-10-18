@@ -6,9 +6,9 @@ import (
 	"github.com/kjkrol/ceremony/internal/steps"
 )
 
-// Word is a word of a moment or a fact P: a state Self or Other is in as the moment says
-// (unit.Fallen, vision.SeesNobody); a plugin makes its own with NewWord, a game those of its
-// own facts.
+// Word is a word of a moment or a fact P: a state Self or Other is in as the moment says (fallen,
+// seeing nobody); the library of a moment makes its own with NewWord, a game those of its own
+// facts.
 type Word[P any] struct {
 	name  string
 	other bool

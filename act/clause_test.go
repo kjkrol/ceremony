@@ -133,7 +133,23 @@ type spot struct {
 }
 
 func (s spot) Who() uid.UID64 { return s.self }
-func (spot) Placed()          {}
+
+// the kinds of places the tests' hosts tell: round a spot or a facing, in front of a facing
+var (
+	round = host.NewPlacing("Round", func(m any) bool {
+		_, spotted := m.(*spot)
+		_, faced := m.(*facing)
+		return spotted || faced
+	})
+	front = host.NewPlacing("Front", func(m any) bool {
+		_, ok := m.(*facing)
+		return ok
+	})
+)
+
+func around(n int) host.Places { return host.Places{Placing: round, N: n} }
+
+func ahead(n int) host.Places { return host.Places{Placing: front, N: n} }
 
 // a rule of a spot over three places round the entity, the middle one playing lake
 func placed(t *testing.T, r act.Rule) (places []uid.UID64, dodged, braced []uid.UID64) {
@@ -151,8 +167,8 @@ func placed(t *testing.T, r act.Rule) (places []uid.UID64, dodged, braced []uid.
 		t.Fatal(err)
 	}
 	tick := host.Tick{Dt: time.Millisecond, Commands: &carrier,
-		Around: func(_ any, rings int, each func(uid.UID64)) {
-			for _, p := range places[:rings+1] {
+		Places: func(_ any, at host.Places, each func(uid.UID64)) {
+			for _, p := range places[:at.N+1] {
 				each(p)
 			}
 		},
@@ -175,8 +191,6 @@ type facing struct {
 }
 
 func (f facing) Who() uid.UID64 { return f.self }
-func (facing) Placed()          {}
-func (facing) Headed()          {}
 
 // a rule of a facing over three places ahead of the entity, the second one playing lake
 func headed(t *testing.T, r act.Rule) (places []uid.UID64, dodged, braced []uid.UID64) {
@@ -194,8 +208,8 @@ func headed(t *testing.T, r act.Rule) (places []uid.UID64, dodged, braced []uid.
 		t.Fatal(err)
 	}
 	tick := host.Tick{Dt: time.Millisecond, Commands: &carrier,
-		Ahead: func(_ any, steps int, each func(uid.UID64)) {
-			for _, p := range places[:min(steps, len(places))] {
+		Places: func(_ any, at host.Places, each func(uid.UID64)) {
+			for _, p := range places[:min(at.N, len(places))] {
 				each(p)
 			}
 		},
@@ -222,17 +236,17 @@ func twice(places ...uid.UID64) []uid.UID64 {
 	return out
 }
 
-func TestAround_RunsThePartHoldingItsClausesOnceAPlace(t *testing.T) {
+func TestAt_RoundRunsThePartHoldingItsClausesOnceAPlace(t *testing.T) {
 	lake := Role("lake")
 	places, dodged, braced := placed(t, act.Branch[spot]{
 		Name: "freeze",
 		When: cond.Self.If(cond.Always),
 		Then: act.OneOf(
 			act.Branch[any]{
-				When: cond.Around(2).If(lake),
-				Then: act.Around(2).Do(dodge{}),
+				When: cond.At(around(2)).If(lake),
+				Then: act.At(around(2)).Do(dodge{}),
 			},
-			act.Around(2).Do(brace{}),
+			act.At(around(2)).Do(brace{}),
 		),
 	})
 	if !slices.Equal(dodged, twice(places[1])) ||
@@ -242,29 +256,29 @@ func TestAround_RunsThePartHoldingItsClausesOnceAPlace(t *testing.T) {
 	}
 }
 
-func TestAround_InTheWhenTurnsTheWholeBranchToEachPlace(t *testing.T) {
+func TestAt_RoundInTheWhenTurnsTheWholeBranchToEachPlace(t *testing.T) {
 	lake := Role("lake")
 	places, dodged, _ := placed(t, act.Branch[spot]{
 		Name: "pull",
-		When: cond.Self.If(cond.Always).And(cond.Around(2).If(lake)),
-		Then: act.Around(2).Do(dodge{}),
+		When: cond.Self.If(cond.Always).And(cond.At(around(2)).If(lake)),
+		Then: act.At(around(2)).Do(dodge{}),
 	})
 	if !slices.Equal(dodged, twice(places[1])) {
 		t.Errorf("dodged %v; want the lake alone", dodged)
 	}
 }
 
-func TestAhead_TurnsTheBranchToEachPlaceAheadWithinTheSteps(t *testing.T) {
+func TestAt_FrontTurnsTheBranchToEachPlaceInFrontWithinTheReach(t *testing.T) {
 	lake := Role("lake")
 	places, dodged, braced := headed(t, act.Branch[facing]{
 		Name: "look ahead",
 		When: cond.Self.If(cond.Always),
 		Then: act.OneOf(
 			act.Branch[any]{
-				When: cond.Ahead(2).If(lake),
-				Then: act.Ahead(2).Do(dodge{}),
+				When: cond.At(ahead(2)).If(lake),
+				Then: act.At(ahead(2)).Do(dodge{}),
 			},
-			act.Ahead(2).Do(brace{}),
+			act.At(ahead(2)).Do(brace{}),
 		),
 	})
 	if !slices.Equal(dodged, twice(places[1])) || !slices.Equal(braced, twice(places[0])) {
@@ -273,40 +287,40 @@ func TestAhead_TurnsTheBranchToEachPlaceAheadWithinTheSteps(t *testing.T) {
 	}
 	_, dodged, _ = headed(t, act.Branch[facing]{
 		Name: "one step",
-		When: cond.Ahead(1).If(lake),
-		Then: act.Ahead(1).Do(dodge{}),
+		When: cond.At(ahead(1)).If(lake),
+		Then: act.At(ahead(1)).Do(dodge{}),
 	})
 	if len(dodged) != 0 {
 		t.Errorf("dodged %v; want nothing: the lake is two steps ahead", dodged)
 	}
 }
 
-func TestAhead_IsNoAroundAndNeedsAHeadedMoment(t *testing.T) {
+func TestAt_OneKindOfPlacesARuleOnAMomentWithThem(t *testing.T) {
 	a := Role("a")
 	for name, c := range map[string]struct {
 		r    act.Rule
 		want string
 	}{
-		"Around and Ahead in one rule": {act.Branch[facing]{
+		"Round and Front in one rule": {act.Branch[facing]{
 			Name: "mixed",
-			When: cond.Around(1).If(a),
-			Then: act.Ahead(1).Do(dodge{}),
+			When: cond.At(around(1)).If(a),
+			Then: act.At(ahead(1)).Do(dodge{}),
 		}, "one kind of places"},
-		"Around and Ahead in one When": {act.Branch[facing]{
+		"Round and Front in one When": {act.Branch[facing]{
 			Name: "mixed",
-			When: cond.Around(1).If(a).And(cond.Ahead(1).If(a)),
+			When: cond.At(around(1)).If(a).And(cond.At(ahead(1)).If(a)),
 			Then: act.Self.Do(dodge{}),
 		}, "one kind of places"},
 		"two steps": {act.Branch[facing]{
 			Name: "steps",
-			When: cond.Ahead(1).If(a),
-			Then: act.Ahead(2).Do(dodge{}),
-		}, "one ring"},
-		"Ahead on a Placed moment that is not Headed": {act.Branch[spot]{
+			When: cond.At(ahead(1)).If(a),
+			Then: act.At(ahead(2)).Do(dodge{}),
+		}, "one reach"},
+		"Front on a moment with places Round alone": {act.Branch[spot]{
 			Name: "blind",
 			When: cond.Self.If(cond.Always),
-			Then: act.Ahead(1).Do(dodge{}),
-		}, "Headed"},
+			Then: act.At(ahead(1)).Do(dodge{}),
+		}, "with places Front"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			defer func() {
@@ -329,17 +343,17 @@ func TestBuild_RefusesWhatTheGrammarDoesNotSay(t *testing.T) {
 	}{
 		"two rings": {act.Branch[spot]{
 			Name: "rings",
-			When: cond.Around(1).If(a),
-			Then: act.Around(2).Do(dodge{}),
-		}, "one ring"},
+			When: cond.At(around(1)).If(a),
+			Then: act.At(around(2)).Do(dodge{}),
+		}, "one reach"},
 		"a word of the other in Self": {act.Branch[spot]{
 			Name: "side",
 			When: cond.Self.If(seen),
 			Then: act.Self.Do(dodge{}),
 		}, "of the other"},
-		"a word in Around": {act.Branch[spot]{
+		"a word in At": {act.Branch[spot]{
 			Name: "place",
-			When: cond.Around(1).If(seen),
+			When: cond.At(around(1)).If(seen),
 			Then: act.Self.Do(dodge{}),
 		}, "of Self or of Other"},
 		"Not of a state alone": {act.Branch[spot]{
