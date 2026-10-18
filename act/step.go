@@ -25,6 +25,7 @@ type Lasting interface {
 // a build is one rule's or plan's: whose places the rule turns to, how many clauses say so,
 // and the moment of a rule (nil in a plan), which its words must be of
 type build struct {
+	placing      steps.Placing
 	rings, total int
 	moment       reflect.Type
 }
@@ -40,12 +41,15 @@ func (b *build) place(s Lasting, n steps.Step, parts ...Lasting) steps.Step {
 			return n
 		}
 	}
-	return steps.NewAround(b.rings, n)
+	return steps.NewPlaces(b.placing, b.rings, n)
 }
 
+// placed is what a step turns to: which places, how far, how many clauses say so; mixed where
+// two say different rings, kinds where two say different kinds
 type placed struct {
+	placing      steps.Placing
 	rings, count int
-	mixed        bool
+	mixed, kinds bool
 }
 
 func (p placed) with(o placed) placed {
@@ -55,8 +59,9 @@ func (p placed) with(o placed) placed {
 	if o.count == 0 {
 		return p
 	}
-	return placed{rings: p.rings, count: p.count + o.count,
-		mixed: p.mixed || o.mixed || p.rings != o.rings}
+	return placed{placing: p.placing, rings: p.rings, count: p.count + o.count,
+		mixed: p.mixed || o.mixed || p.rings != o.rings,
+		kinds: p.kinds || o.kinds || p.placing != o.placing}
 }
 
 type leaf struct {

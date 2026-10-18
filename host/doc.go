@@ -7,8 +7,8 @@
 //
 // A moment is what a pass perceives of an entity, handed to rules and forgotten: a value that
 // is [About] (Who, the entity it is of), [Met] for one entity with others, [Placed] for one
-// standing on places that are entities of their own. [Aimed] is a command told the subject of
-// the moment it is given on.
+// standing on places that are entities of their own, [Headed] for one of those facing somewhere.
+// [Aimed] is a command told the subject of the moment it is given on.
 //
 // # Hosts
 //

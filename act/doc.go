@@ -9,7 +9,7 @@
 //
 // # Steps
 //
-// [Self], [Other] and [Around] are the subjects; their methods are the steps: [Subject.Put],
+// [Self], [Other], [Around] and [Ahead] are the subjects; their methods are the steps: [Subject.Put],
 // [Subject.Take] or [Subject.Hold] an effect, [Subject.Do] a command. [Steps] runs its parts
 // in order, [OneOf] the first that does not fail; both take steps and branches.
 //
@@ -17,7 +17,8 @@
 //
 // A [Branch] at the top of a rule says its Name; every Branch says its When and its Then. It
 // fires at its moment and is done within the pass. A rule turning to places (cond.Around,
-// [Around]) runs once a place: the smallest part of it holding every clause of a place.
+// [Around]; cond.Ahead, [Ahead]) runs once a place: the smallest part of it holding every clause
+// of a place.
 //
 // # For package plan
 //

@@ -20,4 +20,7 @@
 //
 // [Plans] runs a plan.Plans: a system walking every entity with a store.Mind once a step and
 // the store.Facts the plans read and write through.
+//
+// The caller narrows the plans' and the effects' queries with its own goke options (a filter, a
+// pace): both walk them with goke.Query.Paced, each block over the step it is given.
 package goke

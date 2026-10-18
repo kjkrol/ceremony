@@ -7,7 +7,7 @@
 //
 // # Clauses
 //
-// [Self], [Other], [Around] and [On] each take one state: an effect the entity is under, a
+// [Self], [Other], [Around], [Ahead] and [On] each take one state: an effect the entity is under, a
 // role it plays, a [Word] of the moment, [Chance], [Always], or [Not] of any of them. Clauses
 // join with And and Or; [Not] of a whole Cond turns it round. At the top of a rule a role of
 // Self or of Other narrows whom the host walks; anywhere else it is asked of the entity as the

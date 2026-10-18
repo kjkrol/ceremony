@@ -18,10 +18,11 @@ type Effects struct {
 	module *module
 }
 
-// NewEffects runs the effects of reg.
-func NewEffects(reg *effect.Effects) *Effects {
+// NewEffects runs the effects of reg on the entities its queries, narrowed by opts, walk
+// (goke.Query.Paced: each counted down by the step its block is given).
+func NewEffects(reg *effect.Effects, opts ...goke.Opt) *Effects {
 	e := &Effects{Effects: reg}
-	e.system = newEffectSystem(reg)
+	e.system = newEffectSystem(reg, opts)
 	e.module = &module{system: e.system}
 	return e
 }

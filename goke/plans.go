@@ -24,10 +24,12 @@ type Plans struct {
 	minds   *goke.Query
 	anyMind goke.Comp[store.Mind]
 	cb      *goke.CmdBuf
+	opts    []goke.Opt
 }
 
-// NewPlans is the system running p.
-func NewPlans(p *plan.Plans) *Plans { return &Plans{p: p} }
+// NewPlans is the system running p over the entities with a mind its query, narrowed by opts,
+// walks (goke.Query.Paced: a pace among opts has each block go as it says).
+func NewPlans(p *plan.Plans, opts ...goke.Opt) *Plans { return &Plans{p: p, opts: opts} }
 
 var (
 	_ goke.System = (*Plans)(nil)
@@ -37,19 +39,19 @@ var (
 // Init binds the plans; a plan registered after panics.
 func (s *Plans) Init(si *goke.SysInit) {
 	s.si = si
-	qb := si.NewQueryBuilder(&s.mind)
+	qb := si.NewQueryBuilder(&s.mind).With(s.opts...)
 	s.cols = NewColumns(qb)
 	s.p.Bind(s)
 	s.query = qb.Build()
 	s.minds = si.NewQueryBuilder(&s.anyMind).Build()
 }
 
-// Update runs the plans of every entity with a mind.
+// Update runs the plans of every entity its query walks this step.
 func (s *Plans) Update(cb *goke.CmdBuf, dt time.Duration) {
 	s.cb = cb
-	for s.query.All(); s.query.Next(); {
+	for s.query.Paced(dt); s.query.Next(); {
 		cur := s.query.Cursor()
-		s.p.Tick(s.cols.Row(cur), cur.IDs, s.mind.Slice(cur), dt)
+		s.p.Tick(s.cols.Row(cur), cur.IDs, s.mind.Slice(cur), s.query.Dt())
 	}
 }
 

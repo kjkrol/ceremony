@@ -1,5 +1,23 @@
 # Changelog
 
+## v0.2.1
+
+- `cond.Ahead(n)` and `act.Ahead(n)`: the places on the cells one to n steps ahead of the
+  entity, the way it faces, beside `Around(n)`; a rule of a moment that is `host.Headed` (a
+  `Placed` one facing somewhere), the host telling them through `Tick.Ahead`. One kind of
+  places a rule: `Around` and `Ahead` in one are refused as it is built.
+- `goke`: `Active.Left(e)` and `Wide.Left(e)` say what remains of an effect on the entity
+  (`Forever` for one without an end, false while it is not under it), for whoever draws an
+  effect's course.
+- `goke`: `NewPlans(plans, opts...)` and `NewEffects(register, opts...)` take goke options for
+  their queries from the caller (a filter, a pace: goke 3.5's `PacedBy`) and walk them with
+  `Query.Paced`, an effect counting down by the step its block is given. Without options, as
+  before.
+- Fixed: what `Then` casts begins in the pass its forerunner runs out, not the next — there
+  was a step with neither effect's marker, a false window for every rule asking "not under".
+- `doc/ceremony.md`: "How an effect runs", the rules of a cast on a running effect, `Take`,
+  running out, `Then`, `Hold`, `Forever`, `For`, `Toggle`, netting.
+
 ## v0.2.0
 
 The language is free of goke: the one package importing it is the binding `ceremony/goke`, and

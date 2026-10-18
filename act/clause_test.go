@@ -170,6 +170,49 @@ func placed(t *testing.T, r act.Rule) (places []uid.UID64, dodged, braced []uid.
 	return places, dodged, braced
 }
 
+type facing struct {
+	self uid.UID64
+}
+
+func (f facing) Who() uid.UID64 { return f.self }
+func (facing) Placed()          {}
+func (facing) Headed()          {}
+
+// a rule of a facing over three places ahead of the entity, the second one playing lake
+func headed(t *testing.T, r act.Rule) (places []uid.UID64, dodged, braced []uid.UID64) {
+	t.Helper()
+	lake := Role("lake")
+	places = []uid.UID64{uid.UID64(20), uid.UID64(21), uid.UID64(22)}
+	var carrier command.Carrier
+	var dodges command.Queue[dodge]
+	var braces command.Queue[brace]
+	if err := carrier.Carry(&dodges, &braces); err != nil {
+		t.Fatal(err)
+	}
+	h := &host.Rules[facing]{}
+	if err := h.Add(r); err != nil {
+		t.Fatal(err)
+	}
+	tick := host.Tick{Dt: time.Millisecond, Commands: &carrier,
+		Ahead: func(_ any, steps int, each func(uid.UID64)) {
+			for _, p := range places[:min(steps, len(places))] {
+				each(p)
+			}
+		},
+		Roles: func(id uid.UID64) uint64 {
+			if id == places[1] {
+				return 1 << lake.Tag()
+			}
+			return 0
+		}}
+	runRule(t, h, tick, func(id uid.UID64) facing { return facing{self: id} })
+	dodges.Drain(func(i command.Issued[dodge]) { dodged = append(dodged, i.Entity) })
+	braces.Drain(func(i command.Issued[brace]) { braced = append(braced, i.Entity) })
+	slices.Sort(dodged)
+	slices.Sort(braced)
+	return places, dodged, braced
+}
+
 // the rule runs for two entities, so each place comes twice
 func twice(places ...uid.UID64) []uid.UID64 {
 	var out []uid.UID64
@@ -208,6 +251,72 @@ func TestAround_InTheWhenTurnsTheWholeBranchToEachPlace(t *testing.T) {
 	})
 	if !slices.Equal(dodged, twice(places[1])) {
 		t.Errorf("dodged %v; want the lake alone", dodged)
+	}
+}
+
+func TestAhead_TurnsTheBranchToEachPlaceAheadWithinTheSteps(t *testing.T) {
+	lake := Role("lake")
+	places, dodged, braced := headed(t, act.Branch[facing]{
+		Name: "look ahead",
+		When: cond.Self.If(cond.Always),
+		Then: act.OneOf(
+			act.Branch[any]{
+				When: cond.Ahead(2).If(lake),
+				Then: act.Ahead(2).Do(dodge{}),
+			},
+			act.Ahead(2).Do(brace{}),
+		),
+	})
+	if !slices.Equal(dodged, twice(places[1])) || !slices.Equal(braced, twice(places[0])) {
+		t.Errorf("dodged %v, braced %v; want the lake dodged, the first braced, the third unseen",
+			dodged, braced)
+	}
+	_, dodged, _ = headed(t, act.Branch[facing]{
+		Name: "one step",
+		When: cond.Ahead(1).If(lake),
+		Then: act.Ahead(1).Do(dodge{}),
+	})
+	if len(dodged) != 0 {
+		t.Errorf("dodged %v; want nothing: the lake is two steps ahead", dodged)
+	}
+}
+
+func TestAhead_IsNoAroundAndNeedsAHeadedMoment(t *testing.T) {
+	a := Role("a")
+	for name, c := range map[string]struct {
+		r    act.Rule
+		want string
+	}{
+		"Around and Ahead in one rule": {act.Branch[facing]{
+			Name: "mixed",
+			When: cond.Around(1).If(a),
+			Then: act.Ahead(1).Do(dodge{}),
+		}, "one kind of places"},
+		"Around and Ahead in one When": {act.Branch[facing]{
+			Name: "mixed",
+			When: cond.Around(1).If(a).And(cond.Ahead(1).If(a)),
+			Then: act.Self.Do(dodge{}),
+		}, "one kind of places"},
+		"two steps": {act.Branch[facing]{
+			Name: "steps",
+			When: cond.Ahead(1).If(a),
+			Then: act.Ahead(2).Do(dodge{}),
+		}, "one ring"},
+		"Ahead on a Placed moment that is not Headed": {act.Branch[spot]{
+			Name: "blind",
+			When: cond.Self.If(cond.Always),
+			Then: act.Ahead(1).Do(dodge{}),
+		}, "Headed"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			defer func() {
+				msg, _ := recover().(string)
+				if !strings.Contains(msg, c.want) {
+					t.Errorf("panic %q; want one saying %q", msg, c.want)
+				}
+			}()
+			act.Build(c.r)
+		})
 	}
 }
 

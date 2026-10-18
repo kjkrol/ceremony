@@ -59,8 +59,12 @@ func (l loop[P]) node(outer string, b *build) steps.Step {
 		panic(fmt.Sprintf("act: %q needs a Then", name))
 	}
 	low := l.when.(steps.Lowered).Lower(steps.Inside, name)
-	if low.Places > 0 || l.then.places().count > 0 {
-		panic(fmt.Sprintf("act: %q: Around is a rule's: a plan has no places", name))
+	if p := l.then.places(); low.Places > 0 || p.count > 0 {
+		placing := low.Placing
+		if p.count > 0 {
+			placing = p.placing
+		}
+		panic(fmt.Sprintf("act: %q: %s is a rule's: a plan has no places", name, placing))
 	}
 	var until steps.Guard
 	if l.until != nil {

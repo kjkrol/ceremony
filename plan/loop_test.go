@@ -91,6 +91,11 @@ func TestLoop_RefusesWhatAPlanCannotSay(t *testing.T) {
 			When: cond.Self.If(cond.Always),
 			Then: act.Around(1).Do(walk{}),
 		}, "a rule's"},
+		"a place ahead": {plan.Loop[any]{
+			Name: "ahead",
+			When: cond.Self.If(cond.Always),
+			Then: plan.Ahead(1).Do(walk{}),
+		}, "Ahead is a rule's"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			defer func() {

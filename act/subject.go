@@ -14,9 +14,11 @@ const (
 	ofSelf whoKind = iota
 	ofOther
 	ofAround
+	ofAhead
 )
 
-// Subject is whom a step is done by or to: Self, Other or Around(n). Its methods are the steps.
+// Subject is whom a step is done by or to: Self, Other, Around(n) or Ahead(n). Its methods are
+// the steps.
 type Subject struct {
 	kind  whoKind
 	rings int
@@ -34,6 +36,10 @@ var (
 // host.Placed.
 func Around(rings int) Subject { return Subject{kind: ofAround, rings: rings} }
 
+// Ahead is each place on the cells one to steps ahead of the entity, the way it faces, in a rule
+// of a moment that is host.Headed.
+func Ahead(steps int) Subject { return Subject{kind: ofAhead, rings: steps} }
+
 // String says whom.
 func (s Subject) String() string {
 	switch s.kind {
@@ -41,6 +47,8 @@ func (s Subject) String() string {
 		return "Self"
 	case ofOther:
 		return "Other"
+	case ofAhead:
+		return fmt.Sprintf("Ahead(%d)", s.rings)
 	}
 	return fmt.Sprintf("Around(%d)", s.rings)
 }
@@ -100,8 +108,11 @@ func (c clause) node(name string, b *build) steps.Step {
 }
 
 func (c clause) places() placed {
-	if c.who.kind == ofAround {
-		return placed{rings: c.who.rings, count: 1}
+	switch c.who.kind {
+	case ofAround:
+		return placed{placing: steps.AroundPlaces, rings: c.who.rings, count: 1}
+	case ofAhead:
+		return placed{placing: steps.AheadPlaces, rings: c.who.rings, count: 1}
 	}
 	return placed{}
 }

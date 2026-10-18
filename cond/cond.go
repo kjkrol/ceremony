@@ -18,8 +18,8 @@ type Cond interface {
 	cond()
 }
 
-// Subject is whom a clause is about: Self, Other, Around(n) or On(plugin). If makes the
-// clause.
+// Subject is whom a clause is about: Self, Other, Around(n), Ahead(n) or On(plugin). If makes
+// the clause.
 type Subject struct{ who who }
 
 var (
@@ -33,6 +33,10 @@ var (
 // Around is each place within rings of where the entity stands, in a rule of a moment that is
 // host.Placed: the branch runs once a place.
 func Around(rings int) Subject { return Subject{who{kind: ofAround, rings: rings}} }
+
+// Ahead is each place on the cells one to steps ahead of the entity, the way it faces, in a rule
+// of a moment that is host.Headed: the branch runs once a place.
+func Ahead(steps int) Subject { return Subject{who{kind: ofAhead, rings: steps}} }
 
 // On is a plugin's own entity: anything with an Entity.
 func On(plugin any) Subject {
@@ -89,6 +93,7 @@ const (
 	ofSelf whoKind = iota
 	ofOther
 	ofAround
+	ofAhead
 	ofEntity
 )
 
@@ -107,6 +112,8 @@ func (w who) String() string {
 		return "Other"
 	case ofAround:
 		return fmt.Sprintf("Around(%d)", w.rings)
+	case ofAhead:
+		return fmt.Sprintf("Ahead(%d)", w.rings)
 	}
 	return "On(plugin)"
 }
@@ -193,7 +200,7 @@ func (l *lowering) cond(c Cond, top bool) steps.Guard {
 	case negated:
 		inner, ok := v.of.(Cond)
 		if !ok {
-			l.fail("Not(%T) says of nobody: write it inside Self, Other, Around or On", v.of)
+			l.fail("Not(%T) says of nobody: write it inside Self, Other, Around, Ahead or On", v.of)
 		}
 		return steps.GuardNot(l.cond(inner, false))
 	}
@@ -272,11 +279,18 @@ func (l *lowering) whose(w who) steps.Whose {
 		return steps.OfMe
 	case ofOther:
 		return steps.OfSubject
-	case ofAround:
-		if l.out.Places > 0 && l.out.Rings != w.rings {
-			l.fail("Around(%d) and Around(%d): one ring of places a rule", l.out.Rings, w.rings)
+	case ofAround, ofAhead:
+		placing := steps.AroundPlaces
+		if w.kind == ofAhead {
+			placing = steps.AheadPlaces
 		}
-		l.out.Rings, l.out.Places = w.rings, l.out.Places+1
+		switch {
+		case l.out.Places > 0 && l.out.Placing != placing:
+			l.fail("%s(%d) and %s: one kind of places a rule", l.out.Placing, l.out.Rings, w)
+		case l.out.Places > 0 && l.out.Rings != w.rings:
+			l.fail("%s(%d) and %s: one ring of places a rule", l.out.Placing, l.out.Rings, w)
+		}
+		l.out.Placing, l.out.Rings, l.out.Places = placing, w.rings, l.out.Places+1
 		return steps.OfTarget
 	}
 	return steps.OfEntity(w.of)
