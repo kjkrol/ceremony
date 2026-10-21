@@ -55,14 +55,9 @@ func (w Whose) resolve(c *ctx) (uid.UID64, bool) {
 		}
 		if c.instant {
 			if m, ok := c.payload.(met); ok {
-				var other uid.UID64
-				found := false
-				m.Whom(func(id uid.UID64) {
-					if !found {
-						other, found = id, true
-					}
-				})
-				return other, found
+				c.hasFirst = false
+				m.Whom(c.toFirst)
+				return c.first, c.hasFirst
 			}
 			if s, ok := c.payload.(fact.Subject); ok {
 				return s.Subject()
