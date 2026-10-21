@@ -105,6 +105,30 @@ func (c *Carrier) PutFrom(entity uid.UID64, cmd Command) bool {
 	return ok
 }
 
+// PutFromOf is PutFrom of a command whose type C is known: where the queue of C is a Queue[C],
+// cmd goes in without being boxed in an interface.
+func (c *Carrier) PutFromOf[C Command](entity uid.UID64, cmd C) bool {
+	var zero C
+	_, routed := any(zero).(Routed)
+	t := reflect.TypeFor[C]()
+	if routed || t.Kind() == reflect.Interface {
+		return c.PutFrom(entity, cmd)
+	}
+	if c == nil {
+		return false
+	}
+	q, ok := c.queues[t]
+	if !ok {
+		return false
+	}
+	if typed, ok := q.(*Queue[C]); ok {
+		typed.AddFrom(entity, cmd)
+	} else {
+		q.PutFrom(entity, cmd)
+	}
+	return true
+}
+
 // Takes reports whether a queue takes commands of type t.
 func (c *Carrier) Takes(t reflect.Type) bool {
 	if c == nil {
