@@ -5,6 +5,10 @@
 - A step's `Do(cmd)`, in a rule or a plan, gives its command without allocating: before, two
   allocations a command (the copy told whom it aims at, and its box for the carrier). gram's
   navigation tick of 1,000 walkers in the open: 2,599 allocations → 90, its time unchanged.
+- A step on the other of a pair (`act.Other.Do/Put/Take/…` in a rule, `plan.Other` in a plan), a
+  step on places (`act.At(p)`), and a clause of the other asked of a pair moment
+  (`cond.Other.If(state)`) run without allocating: before, two allocations each firing (the
+  callback handed to the moment's `Whom` or the host's `Places`, and the status it set).
 - `command.Carrier.PutFromOf(entity, cmd)`: `PutFrom` of a command whose type is known, put into
   its `Queue` without being boxed; a `Routed` command, or one of an interface type, goes as
   through `PutFrom`.
