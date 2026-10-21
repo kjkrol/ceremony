@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.3.1
+
+- A step's `Do(cmd)`, in a rule or a plan, gives its command without allocating: before, two
+  allocations a command (the copy told whom it aims at, and its box for the carrier). gram's
+  navigation tick of 1,000 walkers in the open: 2,599 allocations → 90, its time unchanged.
+- `command.Carrier.PutFromOf(entity, cmd)`: `PutFrom` of a command whose type is known, put into
+  its `Queue` without being boxed; a `Routed` command, or one of an interface type, goes as
+  through `PutFrom`.
+
 ## v0.3.0
 
 Places are the host's library's, ceremony naming none of its own.
