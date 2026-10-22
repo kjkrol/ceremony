@@ -28,10 +28,10 @@ type effectSystem struct {
 	touched      map[reflect.Type]bool // scratch, reused
 	thens        []uint8               // scratch, reused
 
-	lookup       *goke.Query
 	lookupActive goke.Comp[Active]
-	lookupWide   *goke.Query
 	lookupSlots  goke.Comp[Wide]
+	read         EffectsRead // on the queries of its own; casts and dispels read through it
+	forks        []*EffectsRead
 	activeID     goke.CompID
 	cb           *goke.CmdBuf
 	// Actives on their way to entities, until the next pass: a second cast before the first lands
@@ -106,8 +106,11 @@ func (s *effectSystem) Init(si *goke.SysInit) {
 	}
 	s.narrow.bind(si, s.reg, &s.active, s.opts)
 	s.wide.bind(si, s.reg, &s.wideActive, s.opts)
-	s.lookup = si.NewQueryBuilder(&s.lookupActive).Build()
-	s.lookupWide = si.NewQueryBuilder(&s.lookupSlots).Build()
+	s.read.lookup = si.NewQueryBuilder(&s.lookupActive).Build()
+	s.read.lookupWide = si.NewQueryBuilder(&s.lookupSlots).Build()
+	for _, f := range s.forks {
+		f.fork()
+	}
 	s.activeID = si.RegComp[Active]()
 }
 
@@ -323,14 +326,4 @@ func (s *effectSystem) dispel(id uid.UID64, kind uint8) {
 	}
 }
 
-func (s *effectSystem) has(id uid.UID64, kind uint8) bool { return has(s.slotsOf(id), kind) }
-
-func (s *effectSystem) slotsOf(id uid.UID64) []effectSlot {
-	if s.lookup.Seek(id) {
-		return s.lookupActive.At(s.lookup.Cursor()).Slots[:]
-	}
-	if s.lookupWide.Seek(id) {
-		return s.lookupSlots.At(s.lookupWide.Cursor()).Slots[:]
-	}
-	return nil
-}
+func (s *effectSystem) slotsOf(id uid.UID64) []effectSlot { return s.read.slotsOf(id) }

@@ -2,6 +2,11 @@
 
 ## v0.3.1
 
+- `Effects.Read()` is an `EffectsRead` (`Has`) on the effects' own queries, and
+  `EffectsRead.Fork()` one on queries of its own (goke's `Query.Fork`), for another goroutine:
+  goroutines read which effects the entities are under at once, each through its own, while
+  nothing casts or dispels. A fork made before the effects' system is set up gets its queries
+  then, and new ones whenever it is set up again. goke v3.6.0.
 - A step's `Do(cmd)`, in a rule or a plan, gives its command without allocating: before, two
   allocations a command (the copy told whom it aims at, and its box for the carrier). gram's
   navigation tick of 1,000 walkers in the open: 2,599 allocations → 90, its time unchanged.

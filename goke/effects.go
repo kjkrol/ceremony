@@ -23,6 +23,7 @@ type Effects struct {
 func NewEffects(reg *effect.Effects, opts ...goke.Opt) *Effects {
 	e := &Effects{Effects: reg}
 	e.system = newEffectSystem(reg, opts)
+	e.system.read.s = e.system
 	e.module = &module{system: e.system}
 	return e
 }
@@ -43,7 +44,45 @@ func (e *Effects) CastFor(id uid.UID64, ef effect.Effect, d time.Duration) {
 func (e *Effects) Dispel(id uid.UID64, ef effect.Effect) { e.system.dispel(id, ef.ID()) }
 
 // Has reports whether id is under ef.
-func (e *Effects) Has(id uid.UID64, ef effect.Effect) bool { return e.system.has(id, ef.ID()) }
+func (e *Effects) Has(id uid.UID64, ef effect.Effect) bool { return e.system.read.Has(id, ef) }
+
+// Read reads which effects the entities are under through the effects' own queries.
+func (e *Effects) Read() *EffectsRead { return &e.system.read }
+
+// EffectsRead reads which effects the entities are under, on one goroutine at a time: Read on
+// the effects' own queries, a Fork on queries of its own.
+type EffectsRead struct {
+	s                  *effectSystem
+	lookup, lookupWide *goke.Query // nil until the effects' system is set up
+}
+
+// Fork reads the same effects through queries of its own, for another goroutine; made before the
+// effects' system is set up, it gets them then.
+func (r *EffectsRead) Fork() *EffectsRead {
+	f := &EffectsRead{s: r.s}
+	f.fork()
+	r.s.forks = append(r.s.forks, f)
+	return f
+}
+
+func (r *EffectsRead) fork() {
+	if main := &r.s.read; main.lookup != nil {
+		r.lookup, r.lookupWide = main.lookup.Fork(), main.lookupWide.Fork()
+	}
+}
+
+// Has reports whether id is under ef.
+func (r *EffectsRead) Has(id uid.UID64, ef effect.Effect) bool { return has(r.slotsOf(id), ef.ID()) }
+
+func (r *EffectsRead) slotsOf(id uid.UID64) []effectSlot {
+	if r.lookup.Seek(id) {
+		return r.s.lookupActive.At(r.lookup.Cursor()).Slots[:]
+	}
+	if r.lookupWide.Seek(id) {
+		return r.s.lookupSlots.At(r.lookupWide.Cursor()).Slots[:]
+	}
+	return nil
+}
 
 // Module is the effects as a goke.Module, for the world to install.
 func (e *Effects) Module() goke.Module { return e.module }
