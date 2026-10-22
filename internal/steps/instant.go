@@ -70,6 +70,7 @@ func NewInstant(name string, root Step, payload any) *Instant {
 	}
 	_, names := payload.(fact.Subject)
 	r.c = ctx{instant: true, tree: r.tree, mind: &r.mind, payload: payload, names: names}
+	r.c.toFirst = r.c.keepFirst
 	return r
 }
 
@@ -85,7 +86,11 @@ func (r *Instant) Fire(p Pass, id uid.UID64, entity bool, subject uid.UID64, abo
 // NewForOther runs step on each of the others the moment met, or on its subject, in place of
 // the entity.
 func NewForOther(step Step) Step {
-	return composite{kids: []Step{step}, sign: "forother", make: func() exec { return forOther{} }}
+	return composite{kids: []Step{step}, sign: "forother", make: func() exec {
+		f := &forOther{}
+		f.each = f.on
+		return f
+	}}
 }
 
 // NewSame runs step on the entity itself, inside a step acting on others.
@@ -109,72 +114,99 @@ func (same) tick(c *ctx, _ int, kids []int) Status {
 // entity.
 func NewPlaces(at host.Places, step Step) Step {
 	return composite{kids: []Step{step}, sign: strings.ToLower(at.String()),
-		make: func() exec { return around{at: at} }}
+		make: func() exec {
+			a := &around{at: at}
+			a.each = a.on
+			return a
+		}}
 }
 
 type met interface{ Whom(each func(uid.UID64)) }
 
 type around struct {
 	basic
-	at host.Places
+	at  host.Places
+	c   *ctx
+	kid int
+	st  Status
+	// on, bound once: a closure made at every tick would escape to the heap
+	each func(uid.UID64)
 }
 
-func (around) instant() {}
+func (*around) instant() {}
 
-func (a around) refuses(payload any) string {
+func (a *around) refuses(payload any) string {
 	if a.at.Placing.Takes(payload) {
 		return ""
 	}
 	return fmt.Sprintf("needs a moment with places %s", a.at.Placing)
 }
 
-func (a around) tick(c *ctx, _ int, kids []int) Status {
+func (a *around) tick(c *ctx, _ int, kids []int) Status {
 	tell := c.pass.Places
 	if !c.entity || tell == nil {
 		return Failure
 	}
-	self, st := c.id, Failure
-	tell(c.payload, a.at, func(place uid.UID64) {
-		c.id = place
-		if c.run(kids[0]) == Success {
-			st = Success
-		}
-	})
+	self := c.id
+	a.c = c
+	a.kid = kids[0]
+	a.st = Failure
+	tell(c.payload, a.at, a.each)
 	c.id = self
-	return st
+	return a.st
 }
 
-type forOther struct{ basic }
+func (a *around) on(place uid.UID64) {
+	a.c.id = place
+	if a.c.run(a.kid) == Success {
+		a.st = Success
+	}
+}
 
-func (forOther) instant() {}
+type forOther struct {
+	basic
+	c   *ctx
+	kid int
+	st  Status
+	// on, bound once: a closure made at every tick would escape to the heap
+	each func(uid.UID64)
+}
+
+func (*forOther) instant() {}
 
 // in a plan the other is the subject of the fact the branch stands on
-func (forOther) tick(c *ctx, _ int, kids []int) Status {
+func (f *forOther) tick(c *ctx, _ int, kids []int) Status {
 	if !c.entity {
 		return Failure
 	}
-	self, other, had, st := c.id, c.other, c.hasOther, Failure
-	on := func(id uid.UID64) {
-		c.id, c.other, c.hasOther = id, id, true
-		if c.run(kids[0]) == Success {
-			st = Success
-		}
-	}
+	self, other, had := c.id, c.other, c.hasOther
+	f.c = c
+	f.kid = kids[0]
+	f.st = Failure
 	switch {
 	case !c.instant:
 		if c.about {
-			on(c.subject)
+			f.on(c.subject)
 		}
 	default:
 		switch m := c.payload.(type) {
 		case met:
-			m.Whom(on)
+			m.Whom(f.each)
 		case fact.Subject:
 			if id, ok := m.Subject(); ok {
-				on(id)
+				f.on(id)
 			}
 		}
 	}
 	c.id, c.other, c.hasOther = self, other, had
-	return st
+	return f.st
+}
+
+func (f *forOther) on(id uid.UID64) {
+	f.c.id = id
+	f.c.other = id
+	f.c.hasOther = true
+	if f.c.run(f.kid) == Success {
+		f.st = Success
+	}
 }

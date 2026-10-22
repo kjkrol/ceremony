@@ -20,7 +20,10 @@ type Aimed interface{ Aim(who uid.UID64) }
 
 type order[C command.Command] struct {
 	basic
-	cmd     C
+	cmd C
+	// the command as given: a local told whom it aims at through an interface would escape to
+	// the heap every tick
+	given   C
 	carried *carried[C] // a message's
 }
 
@@ -49,11 +52,12 @@ func (i *order[C]) tick(c *ctx, _ int, _ []int) Status {
 	if !c.entity {
 		return Failure
 	}
-	v := i.cmd
-	if m, ok := any(&v).(fact.Message); ok {
-		return i.send(c, &v, m.Message())
+	v := &i.given
+	*v = i.cmd
+	if m, ok := any(v).(fact.Message); ok {
+		return i.send(c, v, m.Message())
 	}
-	if a, ok := any(&v).(Aimed); ok && c.about {
+	if a, ok := any(v).(Aimed); ok && c.about {
 		a.Aim(c.subject)
 	} else if ok && c.names {
 		return Failure
@@ -62,8 +66,8 @@ func (i *order[C]) tick(c *ctx, _ int, _ []int) Status {
 	if c.sys != nil {
 		commands = c.sys.commands
 	}
-	if !commands.PutFrom(c.id, v) {
-		panic(fmt.Sprintf("rule: no plugin handles %T — Use the one that defines it", v))
+	if !commands.PutFromOf(c.id, *v) {
+		panic(fmt.Sprintf("rule: no plugin handles %T — Use the one that defines it", *v))
 	}
 	return Success
 }

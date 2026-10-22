@@ -121,6 +121,11 @@ type ctx struct {
 	prev, next store.StepSet
 	hops       uint8        // of the message the branch stands under
 	hopsOf     reflect.Type // its type
+	// the first of the others a rule's moment met; toFirst is keepFirst, bound once, as a
+	// closure made at every call would escape to the heap
+	first    uid.UID64
+	hasFirst bool
+	toFirst  func(uid.UID64)
 }
 
 func (c *ctx) run(at int) Status {
@@ -133,6 +138,13 @@ func (c *ctx) run(at int) Status {
 		add(&c.next, at)
 	}
 	return s
+}
+
+func (c *ctx) keepFirst(id uid.UID64) {
+	if !c.hasFirst {
+		c.first = id
+		c.hasFirst = true
+	}
 }
 
 func (c *ctx) wasRunning(at int) bool { return has(&c.prev, at) }
