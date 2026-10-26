@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.3.2
+
+- `host.PairRules.For(marks)` says whether any rule is for an entity carrying marks on its
+  first side, before any other is read: a pass skips the entities no rule is for (vision's scan
+  of only the observers a rule reads).
+
 ## v0.3.1
 
 - `Effects.Read()` is an `EffectsRead` (`Has`) on the effects' own queries, and
