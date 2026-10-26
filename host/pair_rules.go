@@ -138,6 +138,17 @@ func fits(m Marks, f int, s Side) bool {
 	return f < 0 || m.words[f]&(1<<s.bit) != 0
 }
 
+// For reports whether any rule is for an entity carrying self on its first side, whoever the
+// other may be: what a pass may skip for an entity no rule is for, before reading the others.
+func (r *PairRules[P]) For(self Marks) bool {
+	for i := range r.rules {
+		if r.rules[i].first(self) {
+			return true
+		}
+	}
+	return false
+}
+
 // Dispatch runs every rule whose first side self carries and second side other carries.
 func (r *PairRules[P]) Dispatch(t Tick, self, other Marks, pair P) {
 	for _, p := range r.rules {
