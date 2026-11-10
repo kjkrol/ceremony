@@ -6,6 +6,12 @@
   older than v0.2.1 and stays in the module proxy, so `go get -u` raised uid to a version goke
   does not compile against (kjkrol/uid#2). v1.3.0 is v0.3.0's code and retracts v1.2.0.
 
+## v0.3.3
+
+- goke v3.6.1 and `github.com/kjkrol/uid` v1.3.0: uid's v1.2.0 was tagged by mistake from code
+  older than v0.2.1 and stays in the module proxy, so `go get -u` raised uid to a version goke
+  does not compile against (kjkrol/uid#2). v1.3.0 is v0.3.0's code and retracts v1.2.0.
+
 ## v0.3.2
 
 - `host.PairRules.For(marks)` says whether any rule is for an entity carrying marks on its
